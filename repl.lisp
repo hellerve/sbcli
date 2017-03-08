@@ -25,20 +25,18 @@
     (if (not text) (end))
     (let ((parsed
            (handler-case (read-from-string text)
-             (sb-int:simple-reader-error ()
-               (format t "Parser error.~%")))))
+             (error (condition) (format t "Parser error: ~a~%" condition)))))
       (if parsed
         (let ((res
                 (handler-case (eval parsed)
-                  (unbound-variable () (format t "Unbound variable.~%"))
-                  (undefined-function () (format t "Undefined function.~%"))
+                  (unbound-variable (var) (format t "~a~%" var))
+                  (undefined-function (fun) (format t "~a~%" fun))
                   (sb-int:compiled-program-error () (format t "Compiler error.~%"))
-                  (error (condition) (format t "Error: ~a~%" condition)))))
+                  (error (condition) (format t "Compiler error: ~a~%" condition)))))
           (if (eq res :q) (end))
-          (when res
-            (format t "~a~a~%" *ret* res)
-            (finish-output nil))))
-      (main))))
+          (if res (format t "~a~a~%" *ret* res)))))
+      (finish-output nil)
+      (main)))
 
 (if (probe-file *config-file*)
   (load *config-file*))
