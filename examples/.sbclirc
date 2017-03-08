@@ -1,0 +1,3 @@
+(setf *prompt*    "hi> ")
+(setf *ret*       "=>")
+(setf *repl-name* "My Super Custom REPL")
