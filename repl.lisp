@@ -18,25 +18,34 @@
   (format t "Bye for now.~%")
   (exit))
 
+(defun split (str chr)
+  (loop for i = 0 then (1+ j)
+        as j = (position chr str :start i)
+        collect (subseq str i j)
+        while j))
+
 (defun main ()
   (let ((text
           (rl:readline :prompt *prompt*
                        :add-history t)))
     (if (not text) (end))
-    (let ((parsed
-           (handler-case (read-from-string text)
-             (error (condition) (format t "Parser error: ~a~%" condition)))))
-      (if parsed
-        (let ((res
-                (handler-case (eval parsed)
-                  (unbound-variable (var) (format t "~a~%" var))
-                  (undefined-function (fun) (format t "~a~%" fun))
-                  (sb-int:compiled-program-error () (format t "Compiler error.~%"))
-                  (error (condition) (format t "Compiler error: ~a~%" condition)))))
-          (if (eq res :q) (end))
-          (if res (format t "~a~a~%" *ret* res)))))
-      (finish-output nil)
-      (main)))
+    (if (and (> (length text) 1) (string= (subseq text 0 2) ":h"))
+      (let ((splt (split text #\Space)))
+        (inspect (intern (cadr splt))))
+      (let ((parsed
+         (handler-case (read-from-string text)
+           (error (condition) (format t "Parser error: ~a~%" condition)))))
+        (if parsed
+          (let ((res
+                  (handler-case (eval parsed)
+                    (unbound-variable (var) (format t "~a~%" var))
+                    (undefined-function (fun) (format t "~a~%" fun))
+                    (sb-int:compiled-program-error () (format t "Compiler error.~%"))
+                    (error (condition) (format t "Compiler error: ~a~%" condition)))))
+            (if (eq res :q) (end))
+            (if res (format t "~a~a~%" *ret* res))))))
+    (finish-output nil)
+    (main)))
 
 (if (probe-file *config-file*)
   (load *config-file*))
