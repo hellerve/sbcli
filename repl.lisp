@@ -3,7 +3,6 @@
 
 (let ((*standard-output* (make-broadcast-stream)))
   (ql:quickload "cl-readline"))
-
 (defvar *repl-version* "0.0.1")
 (defvar *repl-name*    "Veit's REPL for SBCL")
 (defvar *prompt*       "sbcl> ")
@@ -26,7 +25,7 @@
 
 (defun main ()
   (let ((text
-          (rl:readline :prompt *prompt*
+          (rl:readline :prompt (if (functionp *prompt*) (funcall *prompt*) *prompt*)
                        :add-history t)))
     (if (not text) (end))
     (if (and (> (length text) 1) (string= (subseq text 0 2) ":h"))
