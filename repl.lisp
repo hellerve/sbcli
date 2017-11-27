@@ -23,10 +23,15 @@
         collect (subseq str i j)
         while j))
 
+(defun novelty-check (str1 str2)
+  (string/= (string-trim " " str1)
+            (string-trim " " str2)))
+
 (defun main ()
   (let ((text
           (rl:readline :prompt (if (functionp *prompt*) (funcall *prompt*) *prompt*)
-                       :add-history t)))
+                       :add-history t
+                       :novelty-check #'novelty-check)))
     (if (not text) (end))
     (if (and (> (length text) 1) (string= (subseq text 0 2) ":h"))
       (let ((splt (split text #\Space)))
