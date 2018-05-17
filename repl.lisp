@@ -27,6 +27,28 @@
   (string/= (string-trim " " str1)
             (string-trim " " str2)))
 
+(defun custom-complete (text start end)
+  (declare (ignore end))
+  (labels ((starts-with (text)
+             (lambda (sym)
+               (let* ((symstr (string-downcase sym))
+                      (cmp (subseq symstr 0 (min (length symstr) (length text)))))
+                 (string= text cmp))))
+           (select-completions (list)
+             (let ((els (remove-if-not (starts-with text)
+                                       (mapcar #'string list))))
+               (if (cdr els)
+                   (cons text els)
+                   els)))
+           (get-all-symbols ()
+             (let ((lst ()))
+               (do-all-symbols (s lst)
+                 (when (fboundp s) (push s lst)))
+               lst)))
+      (select-completions (get-all-symbols))))
+
+(rl:register-function :complete #'custom-complete)
+
 (defun main ()
   (let ((text
           (rl:readline :prompt (if (functionp *prompt*) (funcall *prompt*) *prompt*)
