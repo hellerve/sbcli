@@ -8,6 +8,7 @@
 (defvar *repl-version* "0.0.2")
 (defvar *repl-name*    "Veit's REPL for SBCL")
 (defvar *prompt*       "sbcl> ")
+(defvar *prompt2*       "....> ")
 (defvar *ret*          "=> ")
 (defvar *config-file*  "~/.sbclirc")
 
@@ -62,32 +63,36 @@
 
 (rl:register-function :complete #'custom-complete)
 
-(defun main ()
+(defun main (txt p)
   (let ((text
-          (rl:readline :prompt (if (functionp *prompt*) (funcall *prompt*) *prompt*)
+          (rl:readline :prompt (if (functionp p) (funcall p) p)
                        :add-history t
                        :novelty-check #'novelty-check)))
     (if (not text) (end))
     (if (and (> (length text) 1) (string= (subseq text 0 2) ":h"))
       (let ((splt (split text #\Space)))
         (inspect (intern (cadr splt))))
-      (let ((parsed
-         (handler-case (read-from-string text)
-           (error (condition) (format t "Parser error: ~a~%" condition)))))
+      (let* ((new-txt (format nil "~a ~a" txt text))
+             (parsed (handler-case (read-from-string new-txt)
+                       (end-of-file () (main new-txt *prompt2*))
+                       (error (condition)
+                        (format t "Parser error: ~a~%" condition)))))
         (if parsed
           (let ((res
                   (handler-case (eval parsed)
                     (unbound-variable (var) (format t "~a~%" var))
                     (undefined-function (fun) (format t "~a~%" fun))
-                    (sb-int:compiled-program-error () (format t "Compiler error.~%"))
-                    (error (condition) (format t "Compiler error: ~a~%" condition)))))
+                    (sb-int:compiled-program-error ()
+                      (format t "Compiler error.~%"))
+                    (error (condition)
+                      (format t "Compiler error: ~a~%" condition)))))
             (if (eq res :q) (end))
             (if res (format t "~a~a~%" *ret* res))))))
     (finish-output nil)
-    (main)))
+    (main "" *prompt*)))
 
 (if (probe-file *config-file*)
   (load *config-file*))
 
-(handler-case (main)
+(handler-case (main "" *prompt*)
   (sb-sys:interactive-interrupt () (end)))
