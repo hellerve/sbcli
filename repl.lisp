@@ -5,6 +5,11 @@
   (ql:quickload "alexandria")
   (ql:quickload "cl-readline"))
 
+(defpackage :sbcli
+  (:use :common-lisp))
+
+(in-package :sbcli)
+
 (defvar *repl-version* "0.0.2")
 (defvar *repl-name*    "Veit's REPL for SBCL")
 (defvar *prompt*       "sbcl> ")
@@ -18,7 +23,12 @@
 
 (defun end ()
   (format t "Bye for now.~%")
-  (exit))
+  (sb-ext:quit))
+
+(defun reset ()
+  (delete-package 'sbcli)
+  (defpackage :sbcli (:use :common-lisp))
+  (in-package :sbcli))
 
 (defun split (str chr)
   (loop for i = 0 then (1+ j)
@@ -71,7 +81,11 @@
     (if (not text) (end))
     (if (and (> (length text) 1) (string= (subseq text 0 2) ":h"))
       (let ((splt (split text #\Space)))
-        (inspect (intern (cadr splt))))
+        (if (/= (length splt) 2)
+          (format t "Type :h <symbol> to get help on a symbol.~%")
+          (handler-case (inspect (intern (cadr splt)))
+            (error (condition)
+              (format t "Error during inspection: ~a~%" condition)))))
       (let* ((new-txt (format nil "~a ~a" txt text))
              (parsed (handler-case (read-from-string new-txt)
                        (end-of-file () (main new-txt *prompt2*))
@@ -87,6 +101,7 @@
                     (error (condition)
                       (format t "Compiler error: ~a~%" condition)))))
             (if (eq res :q) (end))
+            (if (eq res :r) (reset))
             (if res (format t "~a~a~%" *ret* res))))))
     (finish-output nil)
     (main "" *prompt*)))

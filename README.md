@@ -1,7 +1,7 @@
 # sbcli
 
 A better REPL for SBCL. It handles errors greacefully, is not too verbose,
-and has readline capabilities.
+and has readline capabilities, including multiline input and reset.
 
 ## Installation
 
@@ -14,6 +14,18 @@ install `sbcli` into `/usr/local/bin`. If you are using Mac and having issues wi
 If you have Quicklisp installed, cl-readline will be installed
 on `sbcli`s first launch. `sbcli` assumes that Quicklisp is
 installed under `~/quicklisp`.
+
+## Usage
+
+You should be able to launch `sbcli` by just typing `sbcli`. Once you’re in the
+REPL, you can edit normally with readline capabilities. Hitting tab will
+autocomplete (note that if there are more than one possibilities, you’ll have to
+hit tab twice).
+
+Typing `:h symbol` will enter inspection mode for a symbol. Typing `CTRL-D`
+exits inspection mode.
+
+Typing `:q`, `CTRL-D`, or `CTRL-C` will exit the REPL.
 
 ## Customization
 
