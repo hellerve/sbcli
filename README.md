@@ -27,6 +27,8 @@ exits inspection mode.
 
 Typing `:q`, `CTRL-D`, or `CTRL-C` will exit the REPL.
 
+Typing `:r` resets the environment.
+
 ## Customization
 
 If you want you can add customizations to `sbcli`. On startup
