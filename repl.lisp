@@ -17,10 +17,6 @@
 (defvar *ret*          "=> ")
 (defvar *config-file*  "~/.sbclirc")
 
-(format t "~a version ~a~%" *repl-name* *repl-version*)
-(format t "Press CTRL-C or CTRL-D or type :q to exit~%~%")
-(finish-output nil)
-
 (defun end ()
   (format t "Bye for now.~%")
   (sb-ext:quit))
@@ -108,6 +104,10 @@
 
 (if (probe-file *config-file*)
   (load *config-file*))
+
+(format t "~a version ~a~%" *repl-name* *repl-version*)
+(format t "Press CTRL-C or CTRL-D or type :q to exit~%~%")
+(finish-output nil)
 
 (handler-case (main "" *prompt*)
   (sb-sys:interactive-interrupt () (end)))
