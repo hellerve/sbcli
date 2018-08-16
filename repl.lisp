@@ -10,12 +10,13 @@
 
 (in-package :sbcli)
 
-(defvar *repl-version* "0.0.2")
+(defvar *repl-version* "0.0.3")
 (defvar *repl-name*    "Veit's REPL for SBCL")
 (defvar *prompt*       "sbcl> ")
 (defvar *prompt2*       "....> ")
 (defvar *ret*          "=> ")
 (defvar *config-file*  "~/.sbclirc")
+(defvar *ans*          nil)
 
 (defun end ()
   (format t "Bye for now.~%")
@@ -88,17 +89,18 @@
                        (error (condition)
                         (format t "Parser error: ~a~%" condition)))))
         (if parsed
-          (let ((res
-                  (handler-case (eval parsed)
-                    (unbound-variable (var) (format t "~a~%" var))
-                    (undefined-function (fun) (format t "~a~%" fun))
-                    (sb-int:compiled-program-error ()
-                      (format t "Compiler error.~%"))
-                    (error (condition)
-                      (format t "Compiler error: ~a~%" condition)))))
-            (if (eq res :q) (end))
-            (if (eq res :r) (reset))
-            (if res (format t "~a~a~%" *ret* res))))))
+          (progn
+            (setf *ans*
+                    (handler-case (eval parsed)
+                      (unbound-variable (var) (format t "~a~%" var))
+                      (undefined-function (fun) (format t "~a~%" fun))
+                      (sb-int:compiled-program-error ()
+                        (format t "Compiler error.~%"))
+                      (error (condition)
+                        (format t "Compiler error: ~a~%" condition))))
+            (if (eq *ans* :q) (end))
+            (if (eq *ans* :r) (reset))
+            (if *ans* (format t "~a~a~%" *ret* *ans*))))))
     (finish-output nil)
     (main "" *prompt*)))
 
