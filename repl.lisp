@@ -1,4 +1,4 @@
-#!/usr/bin/env sbcl --script
+#!/usr/bin/env -S sbcl --script
 (load "~/quicklisp/setup")
 
 (let ((*standard-output* (make-broadcast-stream)))
