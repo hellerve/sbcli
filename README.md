@@ -35,7 +35,7 @@ Typing `:r` resets the environment.
 Typing `:s filename` will save all of the expressions that were typed and
 evaluated to the file specified, in the format:
 
-````lisp
+```lisp
 (+ 1 2) ; => 3
 (* 6 10) ; => 60
 ```
