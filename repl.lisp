@@ -10,7 +10,7 @@
 
 (in-package :sbcli)
 
-(defvar *repl-version* "0.0.4")
+(defvar *repl-version* "0.0.5")
 (defvar *repl-name*    "Veit's REPL for SBCL")
 (defvar *prompt*       "sbcl> ")
 (defvar *prompt2*       "....> ")
@@ -91,14 +91,14 @@
     (if (not text) (end))
     (if (string= text "") (main "" *prompt*))
     (cond
-      ((string= (subseq text 0 2) ":h")
+      ((and (> (length text) 1) (string= (subseq text 0 2) ":h"))
         (let ((splt (split text #\Space)))
           (if (/= (length splt) 2)
             (format t "Type :h <symbol> to get help on a symbol.~%")
             (handler-case (inspect (intern (cadr splt)))
               (error (condition)
                 (format t "Error during inspection: ~a~%" condition))))))
-      ((string= (subseq text 0 2) ":s")
+      ((and (> (length text) 1) (string= (subseq text 0 2) ":s"))
         (let ((splt (split text #\Space)))
           (if (/= (length splt) 2)
             (format t "Type :s <file> to save the current session to a file.~%")
