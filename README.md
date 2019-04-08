@@ -32,6 +32,17 @@ Typing `:q`, `CTRL-D`, or `CTRL-C` will exit the REPL.
 
 Typing `:r` resets the environment.
 
+Typing `:s filename` will save all of the expressions that were typed and
+evaluated to the file specified, in the format:
+
+````lisp
+(+ 1 2) ; => 3
+(* 6 10) ; => 60
+```
+
+Of course, depending on your result, this can result in very long lines, or
+break if your result contains newlines. Use at your own peril for now!
+
 ## Customization
 
 If you want you can add customizations to `sbcli`. On startup

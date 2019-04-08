@@ -17,6 +17,7 @@
 (defvar *ret*          "=> ")
 (defvar *config-file*  "~/.sbclirc")
 (defvar *ans*          nil)
+(defvar *hist*         (list))
 
 (defun end ()
   (format t "Bye for now.~%")
@@ -36,6 +37,18 @@
 (defun novelty-check (str1 str2)
   (string/= (string-trim " " str1)
             (string-trim " " str2)))
+
+(defun add-res (txt res) (setq *hist* (cons (list txt res) *hist*)))
+
+(defun format-output (&rest args)
+  (format (car args) "~a ; => ~a" (caadr args) (cadadr args)))
+
+(defun write-to-file (fname)
+  (with-open-file (file fname
+                       :direction :output
+                       :if-exists :supersede
+                       :if-does-not-exist :create)
+    (format file "~{~/sbcli:format-output/~^~%~}" (reverse *hist*))))
 
 (defun custom-complete (text start end)
   (declare (ignore start) (ignore end))
@@ -76,31 +89,40 @@
                        :add-history t
                        :novelty-check #'novelty-check)))
     (if (not text) (end))
-    (if (and (> (length text) 1) (string= (subseq text 0 2) ":h"))
-      (let ((splt (split text #\Space)))
-        (if (/= (length splt) 2)
-          (format t "Type :h <symbol> to get help on a symbol.~%")
-          (handler-case (inspect (intern (cadr splt)))
-            (error (condition)
-              (format t "Error during inspection: ~a~%" condition)))))
-      (let* ((new-txt (format nil "~a ~a" txt text))
-             (parsed (handler-case (read-from-string new-txt)
-                       (end-of-file () (main new-txt *prompt2*))
-                       (error (condition)
-                        (format t "Parser error: ~a~%" condition)))))
-        (if parsed
-          (progn
-            (setf *ans*
-                    (handler-case (eval parsed)
-                      (unbound-variable (var) (format t "~a~%" var))
-                      (undefined-function (fun) (format t "~a~%" fun))
-                      (sb-int:compiled-program-error ()
-                        (format t "Compiler error.~%"))
-                      (error (condition)
-                        (format t "Compiler error: ~a~%" condition))))
-            (if (eq *ans* :q) (end))
-            (if (eq *ans* :r) (reset))
-            (if *ans* (format t "~a~a~%" *ret* *ans*))))))
+    (if (string= text "") (main "" *prompt*))
+    (cond
+      ((string= (subseq text 0 2) ":h")
+        (let ((splt (split text #\Space)))
+          (if (/= (length splt) 2)
+            (format t "Type :h <symbol> to get help on a symbol.~%")
+            (handler-case (inspect (intern (cadr splt)))
+              (error (condition)
+                (format t "Error during inspection: ~a~%" condition))))))
+      ((string= (subseq text 0 2) ":s")
+        (let ((splt (split text #\Space)))
+          (if (/= (length splt) 2)
+            (format t "Type :s <file> to save the current session to a file.~%")
+            (write-to-file (cadr splt)))))
+      (t
+        (let* ((new-txt (format nil "~a ~a" txt text))
+               (parsed (handler-case (read-from-string new-txt)
+                         (end-of-file () (main new-txt *prompt2*))
+                         (error (condition)
+                          (format t "Parser error: ~a~%" condition)))))
+          (if parsed
+            (progn
+              (setf *ans*
+                      (handler-case (eval parsed)
+                        (unbound-variable (var) (format t "~a~%" var))
+                        (undefined-function (fun) (format t "~a~%" fun))
+                        (sb-int:compiled-program-error ()
+                          (format t "Compiler error.~%"))
+                        (error (condition)
+                          (format t "Compiler error: ~a~%" condition))))
+              (if (eq *ans* :q) (end))
+              (if (eq *ans* :r) (reset))
+              (add-res text *ans*)
+              (if *ans* (format t "~a~a~%" *ret* *ans*)))))))
     (finish-output nil)
     (main "" *prompt*)))
 
