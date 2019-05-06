@@ -109,6 +109,7 @@
             (format t "Type :d <symbol> to dump the disassembly of a symbol.~%")
             (handler-case (disassemble (read-from-string (cadr splt)))
               (unbound-variable (var) (format t "~a~%" var))
+              (type-error (err) (format t "~a~%" err))
               (undefined-function (fun) (format t "~a~%" fun))))))
       (t
         (let* ((new-txt (format nil "~a ~a" txt text))
