@@ -8,9 +8,12 @@
 (defpackage :sbcli
   (:use :common-lisp))
 
+(defpackage :sbcli-user
+  (:use :common-lisp :sbcli))
+
 (in-package :sbcli)
 
-(defvar *repl-version* "0.1.0")
+(defvar *repl-version* "0.1.1")
 (defvar *repl-name*    "Veit's REPL for SBCL")
 (defvar *prompt*       "sbcl> ")
 (defvar *prompt2*       "....> ")
@@ -18,12 +21,15 @@
 (defvar *config-file*  "~/.sbclirc")
 (defvar *ans*          nil)
 (defvar *hist*         (list))
+(declaim (special *special*))
 
 (defun end ()
+  "Ends the session"
   (format t "Bye for now.~%")
   (sb-ext:quit))
 
 (defun reset ()
+  "Resets the session environment"
   (delete-package 'sbcli)
   (defpackage :sbcli (:use :common-lisp))
   (in-package :sbcli))
@@ -44,6 +50,7 @@
   (format (car args) "~a ; => ~a" (caadr args) (cadadr args)))
 
 (defun write-to-file (fname)
+  "Writes the current session to a file <filename>"
   (with-open-file (file fname
                        :direction :output
                        :if-exists :supersede
@@ -51,10 +58,31 @@
     (format file "~{~/sbcli:format-output/~^~%~}" (reverse *hist*))))
 
 (defun help (sym)
+  "Gets help on a symbol <sym>"
   (handler-case (inspect (read-from-string sym))
     (error (condition) (format t "Error during inspection: ~a~%" condition))))
 
+(defun general-help ()
+  "Prints a general help message"
+  (format t "~a version ~a~%" *repl-name* *repl-version*)
+  (format t "Special commands:~%")
+  (maphash
+    (lambda (k v) (format t "  :~a: ~a~%" k (documentation (cdr v) t)))
+    *special*)
+  (format t "Currently defined:~%")
+  (do-all-symbols (s *package*)
+    (when (and (or (fboundp s) (boundp s)) (eql (symbol-package s) *package*))
+      (let ((what (if (fboundp s) 'function 'variable)))
+        (format t " ~a: ~a (~a) ~a~%" (string-downcase (string s))
+                                      (or (documentation s what)
+                                          "No documentation")
+                                      what
+                                      (if (boundp s)
+                                        (format nil "(value ~a)" (eval s))
+                                        ""))))))
+
 (defun dump-disasm (sym)
+  "Dumps the disassembly of a symbol <sym>"
   (handler-case (disassemble (read-from-string sym))
     (unbound-variable (var) (format t "~a~%" var))
     (type-error (err) (format t "~a~%" err))
@@ -96,6 +124,7 @@
 (defvar *special*
   (alexandria:alist-hash-table
     `(("h" . (1 . ,#'help))
+      ("help" . (0 . ,#'general-help))
       ("s" . (1 . ,#'write-to-file))
       ("d" . (1 . ,#'dump-disasm))
       ("q" . (0 . ,#'end))
@@ -106,6 +135,7 @@
           (rl:readline :prompt (if (functionp p) (funcall p) p)
                        :add-history t
                        :novelty-check #'novelty-check)))
+    (in-package :sbcli-user)
     (if (not text) (end))
     (if (string= text "") (main "" *prompt*))
     (cond
@@ -134,6 +164,7 @@
                           (format t "Compiler error: ~a~%" condition))))
               (add-res text *ans*)
               (if *ans* (format t "~a~a~%" *ret* *ans*)))))))
+    (in-package :sbcli)
     (finish-output nil)
     (main "" *prompt*)))
 

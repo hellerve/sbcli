@@ -25,6 +25,9 @@ REPL, you can edit normally with readline capabilities. Hitting tab will
 autocomplete (note that if there are more than one possibility, you’ll have to
 hit tab twice).
 
+Typing `:help` will give you an overview over all the available special cases
+and give you an overview over what you’ve defined.
+
 Typing `:h symbol` will enter inspection mode for a symbol. Typing `CTRL-D`
 exits inspection mode.
 
