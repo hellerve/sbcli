@@ -1,3 +1,4 @@
 (setf *prompt*    "hi> ")
 (setf *ret*       "=>")
 (setf *repl-name* "My Super Custom REPL")
+(setf *hist-file* "~/.x") ; set to empty string or nil to disable

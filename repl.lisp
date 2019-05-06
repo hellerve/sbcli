@@ -6,22 +6,39 @@
   (ql:quickload "cl-readline"))
 
 (defpackage :sbcli
-  (:use :common-lisp))
+  (:use :common-lisp :cffi))
 
 (defpackage :sbcli-user
   (:use :common-lisp :sbcli))
 
 (in-package :sbcli)
 
-(defvar *repl-version* "0.1.1")
+(defvar *repl-version* "0.1.2")
 (defvar *repl-name*    "Veit's REPL for SBCL")
 (defvar *prompt*       "sbcl> ")
 (defvar *prompt2*       "....> ")
 (defvar *ret*          "=> ")
 (defvar *config-file*  "~/.sbclirc")
+(defvar *hist-file*    "~/.sbcli_history")
 (defvar *ans*          nil)
 (defvar *hist*         (list))
 (declaim (special *special*))
+
+(defun read-hist-file ()
+  (with-open-file (in *hist-file* :if-does-not-exist :create)
+    (loop for line = (read-line in nil nil)
+      while line
+      ; hack because cl-readline has no function for this. sorry.
+      do (cffi:foreign-funcall "add_history"
+                               :string line
+                               :void))))
+
+(defun update-hist-file (str)
+  (with-open-file (out *hist-file*
+                       :direction :output
+                       :if-exists :append
+                       :if-does-not-exist :create)
+    (format out "~a~%" str)))
 
 (defun end ()
   "Ends the session"
@@ -138,6 +155,7 @@
     (in-package :sbcli-user)
     (if (not text) (end))
     (if (string= text "") (main "" *prompt*))
+    (when *hist-file* (update-hist-file text))
     (cond
       ((and (> (length text) 1) (string= (subseq text 0 1) ":"))
         (let* ((splt (split text #\Space))
@@ -174,6 +192,8 @@
 (format t "~a version ~a~%" *repl-name* *repl-version*)
 (format t "Press CTRL-C or CTRL-D or type :q to exit~%~%")
 (finish-output nil)
+
+(when *hist-file* (read-hist-file))
 
 (handler-case (main "" *prompt*)
   (sb-sys:interactive-interrupt () (end)))
