@@ -50,6 +50,16 @@
                        :if-does-not-exist :create)
     (format file "~{~/sbcli:format-output/~^~%~}" (reverse *hist*))))
 
+(defun help (sym)
+  (handler-case (inspect (read-from-string sym))
+    (error (condition) (format t "Error during inspection: ~a~%" condition))))
+
+(defun dump-disasm (sym)
+  (handler-case (disassemble (read-from-string sym))
+    (unbound-variable (var) (format t "~a~%" var))
+    (type-error (err) (format t "~a~%" err))
+    (undefined-function (fun) (format t "~a~%" fun))))
+
 (defun custom-complete (text start end)
   (declare (ignore start) (ignore end))
   (labels ((common-prefix (items)
@@ -83,6 +93,14 @@
 
 (rl:register-function :complete #'custom-complete)
 
+(defvar *special*
+  (alexandria:alist-hash-table
+    `(("h" . (1 . ,#'help))
+      ("s" . (1 . ,#'write-to-file))
+      ("d" . (1 . ,#'dump-disasm))
+      ("q" . (0 . ,#'end))
+      ("r" . (0 . ,#'reset))) :test 'equal))
+
 (defun main (txt p)
   (let ((text
           (rl:readline :prompt (if (functionp p) (funcall p) p)
@@ -91,26 +109,13 @@
     (if (not text) (end))
     (if (string= text "") (main "" *prompt*))
     (cond
-      ((and (> (length text) 1) (string= (subseq text 0 2) ":h"))
-        (let ((splt (split text #\Space)))
-          (if (/= (length splt) 2)
-            (format t "Type :h <symbol> to get help on a symbol.~%")
-            (handler-case (inspect (intern (cadr splt)))
-              (error (condition)
-                (format t "Error during inspection: ~a~%" condition))))))
-      ((and (> (length text) 1) (string= (subseq text 0 2) ":s"))
-        (let ((splt (split text #\Space)))
-          (if (/= (length splt) 2)
-            (format t "Type :s <file> to save the current session to a file.~%")
-            (write-to-file (cadr splt)))))
-      ((and (> (length text) 1) (string= (subseq text 0 2) ":d"))
-        (let ((splt (split text #\Space)))
-          (if (/= (length splt) 2)
-            (format t "Type :d <symbol> to dump the disassembly of a symbol.~%")
-            (handler-case (disassemble (read-from-string (cadr splt)))
-              (unbound-variable (var) (format t "~a~%" var))
-              (type-error (err) (format t "~a~%" err))
-              (undefined-function (fun) (format t "~a~%" fun))))))
+      ((and (> (length text) 1) (string= (subseq text 0 1) ":"))
+        (let* ((splt (split text #\Space))
+               (k (subseq (car splt) 1 (length (car splt))))
+               (v (gethash k *special*)))
+          (if (not v)
+            (format t "Unknown special command: ~a~%" k)
+            (apply (cdr v) (subseq (cdr splt) 0 (car v))))))
       (t
         (let* ((new-txt (format nil "~a ~a" txt text))
                (parsed (handler-case (read-from-string new-txt)
@@ -127,8 +132,6 @@
                           (format t "Compiler error.~%"))
                         (error (condition)
                           (format t "Compiler error: ~a~%" condition))))
-              (if (eq *ans* :q) (end))
-              (if (eq *ans* :r) (reset))
               (add-res text *ans*)
               (if *ans* (format t "~a~a~%" *ret* *ans*)))))))
     (finish-output nil)
