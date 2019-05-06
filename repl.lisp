@@ -10,7 +10,7 @@
 
 (in-package :sbcli)
 
-(defvar *repl-version* "0.0.5")
+(defvar *repl-version* "0.1.0")
 (defvar *repl-name*    "Veit's REPL for SBCL")
 (defvar *prompt*       "sbcl> ")
 (defvar *prompt2*       "....> ")
@@ -103,6 +103,13 @@
           (if (/= (length splt) 2)
             (format t "Type :s <file> to save the current session to a file.~%")
             (write-to-file (cadr splt)))))
+      ((and (> (length text) 1) (string= (subseq text 0 2) ":d"))
+        (let ((splt (split text #\Space)))
+          (if (/= (length splt) 2)
+            (format t "Type :d <symbol> to dump the disassembly of a symbol.~%")
+            (handler-case (disassemble (read-from-string (cadr splt)))
+              (unbound-variable (var) (format t "~a~%" var))
+              (undefined-function (fun) (format t "~a~%" fun))))))
       (t
         (let* ((new-txt (format nil "~a ~a" txt text))
                (parsed (handler-case (read-from-string new-txt)

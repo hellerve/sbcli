@@ -32,6 +32,8 @@ Typing `:q`, `CTRL-D`, or `CTRL-C` will exit the REPL.
 
 Typing `:r` resets the environment.
 
+Typing `:d symbol` dumps the disassembly of a symbol.
+
 Typing `:s filename` will save all of the expressions that were typed and
 evaluated to the file specified, in the format:
 
