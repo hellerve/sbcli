@@ -6,7 +6,9 @@
   (ql:quickload "cl-readline"))
 
 (defpackage :sbcli
-  (:use :common-lisp :cffi))
+  (:use :common-lisp :cffi)
+  (:export sbcli *repl-version* *repl-name* *prompt* *prompt2* *ret* *config-file*
+           *hist-file* *special*))
 
 (defpackage :sbcli-user
   (:use :common-lisp :sbcli))
@@ -147,14 +149,14 @@
       ("q" . (0 . ,#'end))
       ("r" . (0 . ,#'reset))) :test 'equal))
 
-(defun main (txt p)
+(defun sbcli (txt p)
   (let ((text
           (rl:readline :prompt (if (functionp p) (funcall p) p)
                        :add-history t
                        :novelty-check #'novelty-check)))
     (in-package :sbcli-user)
     (if (not text) (end))
-    (if (string= text "") (main "" *prompt*))
+    (if (string= text "") (sbcli "" *prompt*))
     (when *hist-file* (update-hist-file text))
     (cond
       ((and (> (length text) 1) (string= (subseq text 0 1) ":"))
@@ -167,7 +169,7 @@
       (t
         (let* ((new-txt (format nil "~a ~a" txt text))
                (parsed (handler-case (read-from-string new-txt)
-                         (end-of-file () (main new-txt *prompt2*))
+                         (end-of-file () (sbcli new-txt *prompt2*))
                          (error (condition)
                           (format t "Parser error: ~a~%" condition)))))
           (if parsed
@@ -184,7 +186,7 @@
               (if *ans* (format t "~a~a~%" *ret* *ans*)))))))
     (in-package :sbcli)
     (finish-output nil)
-    (main "" *prompt*)))
+    (sbcli "" *prompt*)))
 
 (if (probe-file *config-file*)
   (load *config-file*))
@@ -195,5 +197,5 @@
 
 (when *hist-file* (read-hist-file))
 
-(handler-case (main "" *prompt*)
+(handler-case (sbcli "" *prompt*)
   (sb-sys:interactive-interrupt () (end)))
