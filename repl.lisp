@@ -79,7 +79,7 @@
 (defun help (sym)
   "Gets help on a symbol <sym>"
   (handler-case (inspect (read-from-string sym))
-    (error (condition) (format t "Error during inspection: ~a~%" condition))))
+    (error (c) (format *error-output* "Error during inspection: ~a~%" c))))
 
 (defun general-help ()
   "Prints a general help message"
@@ -164,24 +164,24 @@
                (k (subseq (car splt) 1 (length (car splt))))
                (v (gethash k *special*)))
           (if (not v)
-            (format t "Unknown special command: ~a~%" k)
+            (format *error-output* "Unknown special command: ~a~%" k)
             (apply (cdr v) (subseq (cdr splt) 0 (car v))))))
       (t
         (let* ((new-txt (format nil "~a ~a" txt text))
                (parsed (handler-case (read-from-string new-txt)
                          (end-of-file () (sbcli new-txt *prompt2*))
                          (error (condition)
-                          (format t "Parser error: ~a~%" condition)))))
+                          (format *error-output* "Parser error: ~a~%" condition)))))
           (if parsed
             (progn
               (setf *ans*
                       (handler-case (eval parsed)
-                        (unbound-variable (var) (format t "~a~%" var))
-                        (undefined-function (fun) (format t "~a~%" fun))
+                        (unbound-variable (var) (format *error-output* "~a~%" var))
+                        (undefined-function (fun) (format *error-output* "~a~%" fun))
                         (sb-int:compiled-program-error ()
-                          (format t "Compiler error.~%"))
+                          (format *error-output* "Compiler error.~%"))
                         (error (condition)
-                          (format t "Compiler error: ~a~%" condition))))
+                          (format *error-output* "Evaluation error: ~a~%" condition))))
               (add-res text *ans*)
               (if *ans* (format t "~a~a~%" *ret* *ans*)))))))
     (in-package :sbcli)
