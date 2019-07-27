@@ -22,7 +22,7 @@ installed under `~/quicklisp`.
 
 You should be able to launch `sbcli` by just typing `sbcli`. Once you’re in the
 REPL, you can edit normally with readline capabilities. Hitting tab will
-autocomplete (note that if there are more than one possibility, you’ll have to
+autocomplete (note that if there is more than one possibility, you’ll have to
 hit tab twice).
 
 Typing `:help` will give you an overview over all the available special cases
