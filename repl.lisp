@@ -134,7 +134,7 @@
            (get-all-symbols ()
              (let ((lst ()))
                (do-all-symbols (s lst)
-                 (when (fboundp s) (push s lst)))
+                 (when (or (fboundp s) (boundp s)) (push s lst)))
                lst)))
       (select-completions (get-all-symbols))))
 
