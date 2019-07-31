@@ -8,7 +8,7 @@
 (defpackage :sbcli
   (:use :common-lisp :cffi)
   (:export sbcli *repl-version* *repl-name* *prompt* *prompt2* *ret* *config-file*
-           *hist-file* *special*))
+           *hist-file* *special* *last-result*))
 
 (defpackage :sbcli-user
   (:use :common-lisp :sbcli))
@@ -22,7 +22,7 @@
 (defvar *ret*          "=> ")
 (defvar *config-file*  "~/.sbclirc")
 (defvar *hist-file*    "~/.sbcli_history")
-(defvar *ans*          nil)
+(defvar *last-result*  nil)
 (defvar *hist*         (list))
 (declaim (special *special*))
 
@@ -179,7 +179,7 @@
                           (format *error-output* "Parser error: ~a~%" condition)))))
           (if parsed
             (progn
-              (setf *ans*
+              (setf *last-result*
                       (handler-case (eval parsed)
                         (unbound-variable (var) (format *error-output* "~a~%" var))
                         (undefined-function (fun) (format *error-output* "~a~%" fun))
@@ -187,8 +187,8 @@
                           (format *error-output* "Compiler error.~%"))
                         (error (condition)
                           (format *error-output* "Evaluation error: ~a~%" condition))))
-              (add-res text *ans*)
-              (if *ans* (format t "~a~a~%" *ret* *ans*)))))))
+              (add-res text *last-result*)
+              (if *last-result* (format t "~a~a~%" *ret* *last-result*)))))))
     (in-package :sbcli)
     (finish-output nil)
     (sbcli "" *prompt*)))
