@@ -165,7 +165,12 @@
                (v (gethash k *special*)))
           (if (not v)
             (format *error-output* "Unknown special command: ~a~%" k)
-            (apply (cdr v) (subseq (cdr splt) 0 (car v))))))
+            (let ((l (car v))
+                  (rl (length (cdr splt))))
+              (if (< rl l)
+                (format *error-output* "Expected ~a arguments to ~a, but got ~a!~%"
+                        l (car splt) rl)
+                (apply (cdr v) (subseq (cdr splt) 0 (car v))))))))
       (t
         (let* ((new-txt (format nil "~a ~a" txt text))
                (parsed (handler-case (read-from-string new-txt)
