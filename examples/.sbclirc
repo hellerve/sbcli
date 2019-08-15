@@ -3,3 +3,5 @@
 (setf *ret*       "=>")
 (setf *repl-name* "My Super Custom REPL")
 (setf *hist-file* "~/.x") ; set to empty string or nil to disable
+(setf *pygmentize* "/path/to/pygmentize/exe") ; path to pygmentize for highlighting;
+                                              ; set to nil to disable
