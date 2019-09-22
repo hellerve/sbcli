@@ -44,7 +44,7 @@ evaluated to the file specified, in the format:
 (+ 1 2) ; => 3
 (* 6 10) ; => 60
 ; *ans* contains the last result
-(+ 2 *ans*) ; = 62
+(+ 2 *ans*) ; => 62
 ```
 
 Of course, depending on your result, this can result in very long lines, or
