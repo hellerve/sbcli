@@ -43,8 +43,8 @@ evaluated to the file specified, in the format:
 ```lisp
 (+ 1 2) ; => 3
 (* 6 10) ; => 60
-; *ans* contains the last result
-(+ 2 *ans*) ; => 62
+; *last-result* contains the last result
+(+ 2 *last-result*) ; => 62
 ```
 
 Of course, depending on your result, this can result in very long lines, or
@@ -58,6 +58,30 @@ if it exists. You can execute arbitrary code there, two of
 the more interesting values to set are `*prompt*` and `*ret*`.
 Check out an example resource file
 [here](https://github.com/hellerve/sbcli/blob/master/examples/.sbclirc).
+
+### Exposed Variables
+
+For reference, here is a complete list of the variables we expose:
+
+```lisp
+; the name of the REPL, printed on top
+*repl-name*    ; => "Veit's REPL for SBCL"
+
+; the prompt and continuation prompt variables
+*prompt*       ; => "sbcl> "
+*prompt2*      ; => "....> "
+
+; the return value prompt
+*ret*          ; => "=> "
+
+; where to store the history
+*hist-file*    ; => "~/.sbcli_history"
+
+; the last result and history variables
+; while nothing prevents you from writing to them, i advise against it
+*last-result*  ; => nil
+*hist*         ; => ()
+```
 
 <hr/>
 
