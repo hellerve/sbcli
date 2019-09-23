@@ -309,7 +309,6 @@ strings to match candidates against (for example in the form \"package:sym\")."
     (finish-output)))
 
 (rl:register-function :complete #'custom-complete)
-(rl:register-function :redisplay #'syntax-hl)
 
 ;; -1 means take the string as one arg
 (defvar *special*
@@ -408,6 +407,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
        (sbcli::handle-input txt text)))
     (in-package :sbcli)
     (finish-output nil)
+    (rl:register-function :redisplay #'syntax-hl)
     (sbcli "" *prompt*)))
 
 (if (probe-file *config-file*)
