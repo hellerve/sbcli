@@ -37,6 +37,8 @@ Typing `:r` resets the environment.
 
 Typing `:d symbol` dumps the disassembly of a symbol.
 
+Typing `:t <expression>` prints the type returned by an expression.
+
 Typing `:s filename` will save all of the expressions that were typed and
 evaluated to the file specified, in the format:
 

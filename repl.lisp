@@ -59,6 +59,14 @@
         collect (subseq str i j)
         while j))
 
+(defun join (str chr)
+  (reduce (lambda (acc x)
+            (if (zerop (length acc))
+                x
+                (concatenate 'string acc chr x)))
+          str
+          :initial-value ""))
+
 (defun novelty-check (str1 str2)
   (string/= (string-trim " " str1)
             (string-trim " " str2)))
@@ -105,6 +113,15 @@
   (handler-case (disassemble (read-from-string sym))
     (unbound-variable (var) (format t "~a~%" var))
     (type-error (err) (format t "~a~%" err))
+    (sb-int:compiled-program-error (err) (format t "~a~%" err))
+    (undefined-function (fun) (format t "~a~%" fun))))
+
+(defun dump-type (expr)
+  "Prints the type of a expression <expr>"
+  (handler-case (format t "~a~%" (type-of (eval (read-from-string expr))))
+    (unbound-variable (var) (format t "~a~%" var))
+    (type-error (err) (format t "~a~%" err))
+    (sb-int:compiled-program-error (err) (format t "~a~%" err))
     (undefined-function (fun) (format t "~a~%" fun))))
 
 (defun custom-complete (text start end)
@@ -140,12 +157,14 @@
 
 (rl:register-function :complete #'custom-complete)
 
+;; -1 means take the string as one arg
 (defvar *special*
   (alexandria:alist-hash-table
     `(("h" . (1 . ,#'help))
       ("help" . (0 . ,#'general-help))
       ("s" . (1 . ,#'write-to-file))
       ("d" . (1 . ,#'dump-disasm))
+      ("t" . (-1 . ,#'dump-type))
       ("q" . (0 . ,#'end))
       ("r" . (0 . ,#'reset))) :test 'equal))
 
@@ -167,10 +186,13 @@
             (format *error-output* "Unknown special command: ~a~%" k)
             (let ((l (car v))
                   (rl (length (cdr splt))))
-              (if (< rl l)
-                (format *error-output* "Expected ~a arguments to ~a, but got ~a!~%"
-                        l (car splt) rl)
-                (apply (cdr v) (subseq (cdr splt) 0 (car v))))))))
+              (cond
+                ((= -1 l) (apply (cdr v) (list (join (cdr splt) " "))))
+                ((< rl l)
+                  (format *error-output*
+                          "Expected ~a arguments to ~a, but got ~a!~%"
+                          l (car splt) rl))
+                (t (apply (cdr v) (subseq (cdr splt) 0 (car v)))))))))
       (t
         (let* ((new-txt (format nil "~a ~a" txt text))
                (parsed (handler-case (read-from-string new-txt)
