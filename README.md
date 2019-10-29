@@ -6,7 +6,8 @@ and has readline capabilities, including multiline input and reset.
 ## Installation
 
 For most cases, calling `./install.sh` should suffice. It will
-install `sbcli` into `/usr/local/bin`. If you are using Mac and having
+install `sbcli` into `$PREFIX/bin`, with the environment variable `PREFIX`
+defaulting to `/usr/local`. If you are using Mac and having
 issues with `cl-readline` see the [installation notes for
 cl-readline](https://github.com/mrkkrp/cl-readline#installation).
 

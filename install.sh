@@ -1,3 +1,3 @@
 #!/bin/bash
 
-cp repl.lisp /usr/local/bin/sbcli
+cp repl.lisp ${PREFIX:-/usr/local}/bin/sbcli
