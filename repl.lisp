@@ -40,11 +40,11 @@
                        :direction :output
                        :if-exists :append
                        :if-does-not-exist :create)
-    (format out "~a~%" str)))
+    (write-line str out)))
 
 (defun end ()
   "Ends the session"
-  (format t "Bye for now.~%")
+  (write-line "Bye for now.")
   (sb-ext:quit))
 
 (defun reset ()
@@ -92,14 +92,17 @@
 (defun general-help ()
   "Prints a general help message"
   (format t "~a version ~a~%" *repl-name* *repl-version*)
-  (format t "Special commands:~%")
+  (write-line "Special commands:")
   (maphash
     (lambda (k v) (format t "  :~a: ~a~%" k (documentation (cdr v) t)))
     *special*)
-  (format t "Currently defined:~%")
+  (write-line "Currently defined:")
+  (print-currently-defined))
+
+(defun print-currently-defined ()
   (do-all-symbols (s *package*)
     (when (and (or (fboundp s) (boundp s)) (eql (symbol-package s) *package*))
-      (let ((what (if (fboundp s) 'function 'variable)))
+      (let ((what (cond ((fboundp s) 'function) ((constantp s) 'constant) (t 'variable))))
         (format t " ~a: ~a (~a) ~a~%" (string-downcase (string s))
                                       (or (documentation s what)
                                           "No documentation")
@@ -124,36 +127,40 @@
     (sb-int:compiled-program-error (err) (format t "~a~%" err))
     (undefined-function (fun) (format t "~a~%" fun))))
 
+(defun common-prefix (items)
+  (let ((lst 0))
+    (loop for n from 1 below (reduce #'min (mapcar #'length items)) do
+      (when (every (lambda (x)
+                      (char= (char (car items) n)
+                             (char x           n)))
+              (cdr items))
+       (setf lst n)))
+   (write lst)
+   (subseq (car items) 0 (1+ lst))))
+
+(defun starts-with (text)
+  (lambda (sym)
+    (let* ((symstr (string-downcase sym))
+           (cmp (subseq symstr 0 (min (length symstr) (length text)))))
+      (string= text cmp))))
+
+(defun select-completions (text list)
+ (let* ((els (remove-if-not (starts-with text)
+                           (mapcar #'string list)))
+        (els (if (cdr els) (cons (common-prefix els) els) els)))
+    (if (string= text (string-downcase text))
+      (mapcar #'string-downcase els)
+      els)))
+
+(defun get-all-symbols ()
+  (let ((lst ()))
+    (do-all-symbols (s lst)
+      (when (or (fboundp s) (boundp s)) (push s lst)))
+    lst))
+
 (defun custom-complete (text start end)
   (declare (ignore start) (ignore end))
-  (labels ((common-prefix (items)
-             (let ((lst 0))
-              (loop for n from 1 below (reduce #'min (mapcar #'length items)) do
-                (when (every (lambda (x)
-                             (char= (char (car items) n)
-                                    (char x           n)))
-                         (cdr items))
-                  (setf lst n)))
-              (write lst)
-              (subseq (car items) 0 (+ lst 1))))
-           (starts-with (text)
-             (lambda (sym)
-               (let* ((symstr (string-downcase sym))
-                      (cmp (subseq symstr 0 (min (length symstr) (length text)))))
-                 (string= text cmp))))
-           (select-completions (list)
-             (let* ((els (remove-if-not (starts-with text)
-                                       (mapcar #'string list)))
-                    (els (if (cdr els) (cons (common-prefix els) els) els)))
-                (if (string= text (string-downcase text))
-                  (mapcar #'string-downcase els)
-                  els)))
-           (get-all-symbols ()
-             (let ((lst ()))
-               (do-all-symbols (s lst)
-                 (when (or (fboundp s) (boundp s)) (push s lst)))
-               lst)))
-      (select-completions (get-all-symbols))))
+  (select-completions text (get-all-symbols)))
 
 (rl:register-function :complete #'custom-complete)
 
@@ -168,49 +175,61 @@
       ("q" . (0 . ,#'end))
       ("r" . (0 . ,#'reset))) :test 'equal))
 
+(defun call-special (fundef call args)
+  (let ((l (car fundef))
+        (fun (cdr fundef))
+        (rl (length args)))
+    (cond
+      ((= -1 l) (funcall fun (join args " ")))
+      ((< rl l)
+        (format *error-output*
+                "Expected ~a arguments to ~a, but got ~a!~%"
+                l call rl))
+      (t (apply fun (subseq args 0 l))))))
+
+(defun handle-special-input (text)
+  (let* ((splt (split text #\Space))
+         (k (subseq (car splt) 1 (length (car splt))))
+         (v (gethash k *special*)))
+    (if v
+      (call-special v (car splt) (cdr splt))
+      (format *error-output* "Unknown special command: ~a~%" k))))
+
+(defun evaluate-lisp (text parsed)
+  (setf *last-result*
+        (handler-case (eval parsed)
+          (unbound-variable (var) (format *error-output* "~a~%" var))
+          (undefined-function (fun) (format *error-output* "~a~%" fun))
+          (sb-int:compiled-program-error ()
+            (format *error-output* "Compiler error.~%"))
+          (error (condition)
+            (format *error-output* "Evaluation error: ~a~%" condition))))
+  (add-res text *last-result*)
+  (if *last-result* (format t "~a~a~%" *ret* *last-result*)))
+
+(defun handle-lisp (before text)
+  (let* ((new-txt (format nil "~a ~a" before text))
+         (parsed (handler-case (read-from-string new-txt)
+                   (end-of-file () (sbcli new-txt *prompt2*))
+                   (error (condition)
+                    (format *error-output* "Parser error: ~a~%" condition)))))
+    (when parsed (evaluate-lisp text parsed))))
+
+(defun handle-input (before text)
+  (if (and (> (length text) 1) (string= (subseq text 0 1) ":"))
+    (handle-special-input text)
+    (handle-lisp before text)))
+
 (defun sbcli (txt p)
   (let ((text
           (rl:readline :prompt (if (functionp p) (funcall p) p)
                        :add-history t
                        :novelty-check #'novelty-check)))
     (in-package :sbcli-user)
-    (if (not text) (end))
+    (unless text (end))
     (if (string= text "") (sbcli "" *prompt*))
     (when *hist-file* (update-hist-file text))
-    (cond
-      ((and (> (length text) 1) (string= (subseq text 0 1) ":"))
-        (let* ((splt (split text #\Space))
-               (k (subseq (car splt) 1 (length (car splt))))
-               (v (gethash k *special*)))
-          (if (not v)
-            (format *error-output* "Unknown special command: ~a~%" k)
-            (let ((l (car v))
-                  (rl (length (cdr splt))))
-              (cond
-                ((= -1 l) (apply (cdr v) (list (join (cdr splt) " "))))
-                ((< rl l)
-                  (format *error-output*
-                          "Expected ~a arguments to ~a, but got ~a!~%"
-                          l (car splt) rl))
-                (t (apply (cdr v) (subseq (cdr splt) 0 (car v)))))))))
-      (t
-        (let* ((new-txt (format nil "~a ~a" txt text))
-               (parsed (handler-case (read-from-string new-txt)
-                         (end-of-file () (sbcli new-txt *prompt2*))
-                         (error (condition)
-                          (format *error-output* "Parser error: ~a~%" condition)))))
-          (if parsed
-            (progn
-              (setf *last-result*
-                      (handler-case (eval parsed)
-                        (unbound-variable (var) (format *error-output* "~a~%" var))
-                        (undefined-function (fun) (format *error-output* "~a~%" fun))
-                        (sb-int:compiled-program-error ()
-                          (format *error-output* "Compiler error.~%"))
-                        (error (condition)
-                          (format *error-output* "Evaluation error: ~a~%" condition))))
-              (add-res text *last-result*)
-              (if *last-result* (format t "~a~a~%" *ret* *last-result*)))))))
+    (handle-input txt text)
     (in-package :sbcli)
     (finish-output nil)
     (sbcli "" *prompt*)))
@@ -219,7 +238,8 @@
   (load *config-file*))
 
 (format t "~a version ~a~%" *repl-name* *repl-version*)
-(format t "Press CTRL-C or CTRL-D or type :q to exit~%~%")
+(write-line "Press CTRL-C or CTRL-D or type :q to exit")
+(write-char #\linefeed)
 (finish-output nil)
 
 (when *hist-file* (read-hist-file))
