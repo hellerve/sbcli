@@ -1,3 +1,3 @@
 #!/bin/sh
 
-install -Dm755 repl.lisp ${PREFIX:-/usr/local}/bin/sbcli
+install -m755 repl.lisp ${PREFIX:-/usr/local}/bin/sbcli
