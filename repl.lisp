@@ -89,6 +89,22 @@
   (handler-case (inspect (read-from-string sym))
     (error (c) (format *error-output* "Error during inspection: ~a~%" c))))
 
+(defun symbol-documentation (symbol/string)
+  "Print the available documentation for this symbol."
+  ;; Normally, the documentation function takes as second argument the
+  ;; type designator. We loop over each type and print the available
+  ;; documentation.
+  (handler-case (loop for doc-type in '(variable function structure type setf)
+                   with sym = (if (stringp symbol/string)
+                                  ;; used from the readline REPL
+                                  (read-from-string symbol)
+                                  ;; used from Slime
+                                  symbol/string)
+                   for doc = (documentation sym doc-type)
+                   when doc
+                   do (format t "~a: ~a~&" doc-type doc))
+    (error (c) (format *error-output* "Error during documentation lookup: ~a~&" c))))
+
 (defun general-help ()
   "Prints a general help message"
   (format t "~a version ~a~%" *repl-name* *repl-version*)
@@ -169,6 +185,7 @@
   (alexandria:alist-hash-table
     `(("h" . (1 . ,#'help))
       ("help" . (0 . ,#'general-help))
+      ("doc" . (1 . ,#'symbol-documentation))
       ("s" . (1 . ,#'write-to-file))
       ("d" . (1 . ,#'dump-disasm))
       ("t" . (-1 . ,#'dump-type))
