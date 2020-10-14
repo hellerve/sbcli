@@ -97,7 +97,7 @@
   (handler-case (loop for doc-type in '(variable function structure type setf)
                    with sym = (if (stringp symbol/string)
                                   ;; used from the readline REPL
-                                  (read-from-string symbol)
+                                  (read-from-string symbol/string)
                                   ;; used from Slime
                                   symbol/string)
                    for doc = (documentation sym doc-type)
