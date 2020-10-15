@@ -3,8 +3,7 @@
 
 (let ((*standard-output* (make-broadcast-stream)))
   (ql:quickload "alexandria")
-  (ql:quickload "cl-readline")
-  (ql:quickload "trivial-arguments"))
+  (ql:quickload "cl-readline"))
 
 (defpackage :sbcli
   (:use :common-lisp :cffi)
@@ -105,7 +104,8 @@
                    when doc
                    do (format t "~a: ~a~&" doc-type doc)
                    and when (equal doc-type 'function)
-                   do (format t "ARGLIST: ~a~&" (trivial-arguments:arglist sym))))
+                   do (format t "ARGLIST: ~a~&"
+                              (sb-introspect:function-lambda-list sym)))
     (error (c) (format *error-output* "Error during documentation lookup: ~a~&" c))))
 
 (defun general-help ()
