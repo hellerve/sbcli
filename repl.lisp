@@ -5,6 +5,8 @@
   (ql:quickload "alexandria")
   (ql:quickload "cl-readline"))
 
+(require :sb-introspect)
+
 (defpackage :sbcli
   (:use :common-lisp :cffi)
   (:export sbcli *repl-version* *repl-name* *prompt* *prompt2* *ret* *config-file*
@@ -100,9 +102,14 @@
                                   (read-from-string symbol/string)
                                   ;; used from Slime
                                   symbol/string)
-                   for doc = (documentation sym doc-type)
+                   for doc = (unless (consp sym)
+                               ;; When the user enters :doc 'sym instead of :doc sym
+                               (documentation sym doc-type))
                    when doc
-                   do (format t "~a: ~a~&" doc-type doc))
+                   do (format t "~a: ~a~&" doc-type doc)
+                   and when (equal doc-type 'function)
+                   do (format t "ARGLIST: ~a~&"
+                              (sb-introspect:function-lambda-list sym)))
     (error (c) (format *error-output* "Error during documentation lookup: ~a~&" c))))
 
 (defun general-help ()
