@@ -5,6 +5,8 @@
   (ql:quickload "alexandria")
   (ql:quickload "cl-readline"))
 
+(require :sb-introspect)
+
 (defpackage :sbcli
   (:use :common-lisp :cffi)
   (:export sbcli *repl-version* *repl-name* *prompt* *prompt2* *ret* *config-file*
