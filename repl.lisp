@@ -100,7 +100,9 @@
                                   (read-from-string symbol/string)
                                   ;; used from Slime
                                   symbol/string)
-                   for doc = (documentation sym doc-type)
+                   for doc = (unless (consp sym)
+                               ;; When the user enters :doc 'sym instead of :doc sym
+                               (documentation sym doc-type))
                    when doc
                    do (format t "~a: ~a~&" doc-type doc)
                    and when (equal doc-type 'function)
