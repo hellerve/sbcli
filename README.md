@@ -82,6 +82,10 @@ For reference, here is a complete list of the variables we expose:
 ; the history variable
 ; while nothing prevents you from writing to it, i advise against it
 *hist*         ; => ()
+
+; you can optionally set a path to pygmentize to enable syntax-coloring
+; in the REPL
+*pygmentize*
 ```
 
 <hr/>
