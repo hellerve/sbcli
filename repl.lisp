@@ -334,7 +334,15 @@ strings to match candidates against (for example in the form \"package:sym\")."
     (unless text (end))
     (if (string= text "") (sbcli "" *prompt*))
     (when *hist-file* (update-hist-file text))
-    (handle-input txt text)
+    (cond
+      ((str:ends-with-p " ?" text)
+       ;; a trailing " ?" prints the symbol documentation.
+       (sbcli::symbol-documentation (str:trim
+                                     (str:replace-using (list "("  ""
+                                                              " ?" "")
+                                                        text))))
+      (t
+       (sbcli::handle-input txt text)))
     (in-package :sbcli)
     (finish-output nil)
     (sbcli "" *prompt*)))
