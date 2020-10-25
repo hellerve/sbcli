@@ -108,7 +108,8 @@
                                (documentation sym doc-type))
                    when doc
                    do (format t "~a: ~a~&" doc-type doc)
-                   when (equal doc-type 'function)
+                   when (and (equal doc-type 'function)
+                             (fboundp sym))
                    do (format t "ARGLIST: ~a~&"
                               (format nil "~(~a~)"
                                       (sb-introspect:function-lambda-list sym))))
