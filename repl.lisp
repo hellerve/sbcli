@@ -29,6 +29,8 @@
 (defvar *hist*         (list))
 (declaim (special *special*))
 
+(load "utils.lisp")
+
 (defun read-hist-file ()
   (with-open-file (in *hist-file* :if-does-not-exist :create)
     (loop for line = (read-line in nil nil)
@@ -338,10 +340,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
     (cond
       ((str:ends-with-p " ?" text)
        ;; a trailing " ?" prints the symbol documentation.
-       (sbcli::symbol-documentation (str:trim
-                                     (str:replace-using (list "("  ""
-                                                              " ?" "")
-                                                        text))))
+       (sbcli::symbol-documentation (last-nested-expr text)))
       (t
        (sbcli::handle-input txt text)))
     (in-package :sbcli)
