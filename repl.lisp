@@ -29,6 +29,8 @@
 (defvar *hist*         (list))
 (declaim (special *special*))
 
+(load "utils.lisp")
+
 (defun read-hist-file ()
   (with-open-file (in *hist-file* :if-does-not-exist :create)
     (loop for line = (read-line in nil nil)
@@ -108,7 +110,8 @@
                                (documentation sym doc-type))
                    when doc
                    do (format t "~a: ~a~&" doc-type doc)
-                   when (equal doc-type 'function)
+                   when (and (equal doc-type 'function)
+                             (fboundp sym))
                    do (format t "ARGLIST: ~a~&"
                               (format nil "~(~a~)"
                                       (sb-introspect:function-lambda-list sym))))
@@ -334,7 +337,12 @@ strings to match candidates against (for example in the form \"package:sym\")."
     (unless text (end))
     (if (string= text "") (sbcli "" *prompt*))
     (when *hist-file* (update-hist-file text))
-    (handle-input txt text)
+    (cond
+      ((str:ends-with-p " ?" text)
+       ;; a trailing " ?" prints the symbol documentation.
+       (sbcli::symbol-documentation (last-nested-expr text)))
+      (t
+       (sbcli::handle-input txt text)))
     (in-package :sbcli)
     (finish-output nil)
     (sbcli "" *prompt*)))

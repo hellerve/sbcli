@@ -32,6 +32,8 @@ exits inspection mode.
 
 Typing `:doc symbol` prints the available documentation for this symbol.
 
+Typing `(symbol ?` also prints the available documentation for this symbol.
+
 Typing `:q`, `CTRL-D`, or `CTRL-C` will exit the REPL.
 
 Typing `:r` resets the environment.
