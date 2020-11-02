@@ -313,7 +313,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
           (error (condition)
             (format *error-output* "Evaluation error: ~a~%" condition))))
   (add-res text *last-result*)
-  (if *last-result* (format t "~a~a~%" *ret* *last-result*)))
+  (if *last-result* (format t "~a~s~%" *ret* *last-result*)))
 
 (defun handle-lisp (before text)
   (let* ((new-txt (format nil "~a ~a" before text))
