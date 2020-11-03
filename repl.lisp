@@ -330,9 +330,13 @@ strings to match candidates against (for example in the form \"package:sym\")."
 
 (defun sbcli (txt p)
   (let ((text
-          (rl:readline :prompt (if (functionp p) (funcall p) p)
-                       :add-history t
-                       :novelty-check #'novelty-check)))
+         (handler-case
+             (rl:readline :prompt (if (functionp p) (funcall p) p)
+                          :add-history t
+                          :novelty-check #'novelty-check)
+           (sb-sys:interactive-interrupt ()
+             (write-char #\linefeed)
+             ""))))
     (in-package :sbcli-user)
     (unless text (end))
     (if (string= text "") (sbcli "" *prompt*))
@@ -351,7 +355,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
   (load *config-file*))
 
 (format t "~a version ~a~%" *repl-name* *repl-version*)
-(write-line "Press CTRL-C or CTRL-D or type :q to exit")
+(write-line "Press CTRL-D or type :q to exit")
 (write-char #\linefeed)
 (finish-output nil)
 
