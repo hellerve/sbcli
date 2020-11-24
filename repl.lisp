@@ -11,7 +11,7 @@
 (defpackage :sbcli
   (:use :common-lisp :cffi)
   (:export sbcli *repl-version* *repl-name* *prompt* *prompt2* *ret* *config-file*
-           *hist-file* *special* *last-result*))
+           *hist-file* *special*))
 
 (defpackage :sbcli-user
   (:use :common-lisp :sbcli))
@@ -25,7 +25,6 @@
 (defvar *ret*          "=> ")
 (defvar *config-file*  "~/.sbclirc")
 (defvar *hist-file*    "~/.sbcli_history")
-(defvar *last-result*  nil)
 (defvar *hist*         (list))
 (declaim (special *special*))
 
@@ -304,16 +303,34 @@ strings to match candidates against (for example in the form \"package:sym\")."
       (format *error-output* "Unknown special command: ~a~%" k))))
 
 (defun evaluate-lisp (text parsed)
-  (setf *last-result*
-        (handler-case (eval parsed)
-          (unbound-variable (var) (format *error-output* "~a~%" var))
-          (undefined-function (fun) (format *error-output* "~a~%" fun))
-          (sb-int:compiled-program-error ()
-            (format *error-output* "Compiler error.~%"))
-          (error (condition)
-            (format *error-output* "Evaluation error: ~a~%" condition))))
-  (add-res text *last-result*)
-  (if *last-result* (format t "~a~s~%" *ret* *last-result*)))
+  "Evaluate (EVAL) the user input.
+  In case of evaluation error, print the error.
+  Then print the result. Print its multiple values on multiple lines.
+  Save the input history.
+  Handle the special *, + et all REPL history variables."
+  (let ((result-list
+         (multiple-value-list
+          (handler-case (eval parsed)
+            (unbound-variable (var)
+              (format *error-output* "~a~%" var))
+            (undefined-function (fun)
+              (format *error-output* "~a~%" fun))
+            (sb-int:compiled-program-error ()
+              (format *error-output* "Compiler error.~%"))
+            (error (condition)
+              (format *error-output* "~Evaluation error: ~a~%" condition))))))
+    (when result-list
+      (add-res text (car result-list))
+      (setf +++ ++
+            /// //
+            *** (car ///)
+            ++ +
+            // /
+            ** (car //)
+            + parsed
+            / result-list
+            * (car result-list))
+      (format t "~a~{~s~&~}~%" *ret* result-list))))
 
 (defun handle-lisp (before text)
   (let* ((new-txt (format nil "~a ~a" before text))
@@ -324,7 +341,8 @@ strings to match candidates against (for example in the form \"package:sym\")."
     (when parsed (evaluate-lisp text parsed))))
 
 (defun handle-input (before text)
-  (if (and (> (length text) 1) (string= (subseq text 0 1) ":"))
+  (if (and (> (length text) 1)
+           (string= (subseq text 0 1) ":"))
     (handle-special-input text)
     (handle-lisp before text)))
 

@@ -48,8 +48,6 @@ evaluated to the file specified, in the format:
 ```lisp
 (+ 1 2) ; => 3
 (* 6 10) ; => 60
-; *last-result* contains the last result
-(+ 2 *last-result*) ; => 62
 ```
 
 Of course, depending on your result, this can result in very long lines, or
@@ -81,9 +79,8 @@ For reference, here is a complete list of the variables we expose:
 ; where to store the history
 *hist-file*    ; => "~/.sbcli_history"
 
-; the last result and history variables
-; while nothing prevents you from writing to them, i advise against it
-*last-result*  ; => nil
+; the history variable
+; while nothing prevents you from writing to it, i advise against it
 *hist*         ; => ()
 ```
 
