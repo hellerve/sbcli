@@ -318,7 +318,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
             (sb-int:compiled-program-error ()
               (format *error-output* "Compiler error.~%"))
             (error (condition)
-              (format *error-output* "~Evaluation error: ~a~%" condition))))))
+              (format *error-output* "Evaluation error: ~a~%" condition))))))
     (when result-list
       (add-res text (car result-list))
       (setf +++ ++
