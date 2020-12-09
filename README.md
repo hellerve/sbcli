@@ -1,7 +1,8 @@
 # sbcli
 
-A better REPL for SBCL. It handles errors greacefully, is not too verbose, and
-has readline capabilities, including multiline input and reset.
+A better REPL for SBCL. It handles errors greacefully, is not too verbose, has
+readline capabilities, including multiline input and reset, and has optional
+syntax highlighting capabilities using [pygmentize](https://pygments.org/).
 
 ## Installation
 
@@ -82,6 +83,13 @@ For reference, here is a complete list of the variables we expose:
 ; the history variable
 ; while nothing prevents you from writing to it, i advise against it
 *hist*         ; => ()
+
+; you can optionally set a path to pygmentize to enable syntax-coloring
+; in the REPL. N.B: might lead to slower rendering speed
+;
+; if you're unsure what to put there, i suggest using
+; [which](https://github.com/eudoxia0/which)
+*pygmentize* ; => nil
 ```
 
 <hr/>

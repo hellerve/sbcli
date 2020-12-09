@@ -26,6 +26,7 @@
 (defvar *config-file*  "~/.sbclirc")
 (defvar *hist-file*    "~/.sbcli_history")
 (defvar *hist*         (list))
+(defvar *pygmentize*   nil)
 (declaim (special *special*))
 
 (defun last-nested-expr (s/sexp)
@@ -289,7 +290,26 @@ strings to match candidates against (for example in the form \"package:sym\")."
                   (custom-complete "uiop:file-")
                   :test #'string-equal)))
 
+(defun maybe-highlight (str)
+  (if *pygmentize*
+    (with-input-from-string (s str)
+      (let ((proc (sb-ext:run-program *pygmentize*
+                                      (list "-s" "-l" "lisp")
+                                      :input s
+                                      :output :stream)))
+         (read-line (sb-ext:process-output proc) nil "")))
+    str))
+
+(defun syntax-hl ()
+  (rl:redisplay)
+  (let ((res (maybe-highlight rl:*line-buffer*)))
+    (format t "~c[2K~c~a~a~c[~aD" #\esc #\return rl:*display-prompt* res #\esc (- rl:+end+ rl:*point*))
+    (when (= rl:+end+ rl:*point*)
+      (format t "~c[1C" #\esc))
+    (finish-output)))
+
 (rl:register-function :complete #'custom-complete)
+(rl:register-function :redisplay #'syntax-hl)
 
 ;; -1 means take the string as one arg
 (defvar *special*
@@ -388,6 +408,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
        (sbcli::handle-input txt text)))
     (in-package :sbcli)
     (finish-output nil)
+    (rl:register-function :redisplay #'syntax-hl)
     (sbcli "" *prompt*)))
 
 (if (probe-file *config-file*)
