@@ -11,7 +11,7 @@
 (defpackage :sbcli
   (:use :common-lisp :cffi)
   (:export sbcli *repl-version* *repl-name* *prompt* *prompt2* *ret* *config-file*
-           *hist-file* *special*))
+           *hist-file* *special* *error*))
 
 (defpackage :sbcli-user
   (:use :common-lisp :sbcli))
@@ -27,6 +27,7 @@
 (defvar *hist-file*    "~/.sbcli_history")
 (defvar *hist*         (list))
 (defvar *pygmentize*   nil)
+(defvar *error*        nil)
 (declaim (special *special*))
 
 (defun last-nested-expr (s/sexp)
@@ -359,6 +360,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
             (sb-int:compiled-program-error ()
               (format *error-output* "Compiler error.~%"))
             (error (condition)
+	      (setf *error* condition)
               (format *error-output* "Evaluation error: ~a~%" condition))))))
     (when result-list
       (add-res text (car result-list))
@@ -421,5 +423,8 @@ strings to match candidates against (for example in the form \"package:sym\")."
 
 (when *hist-file* (read-hist-file))
 
+(sb-ext:enable-debugger)
+
 (handler-case (sbcli "" *prompt*)
   (sb-sys:interactive-interrupt () (end)))
+
