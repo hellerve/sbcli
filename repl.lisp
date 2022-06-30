@@ -18,7 +18,7 @@
 
 (in-package :sbcli)
 
-(defvar *repl-version* "0.1.3")
+(defvar *repl-version* "0.1.4")
 (defvar *repl-name*    "Veit's REPL for SBCL")
 (defvar *prompt*       "sbcl> ")
 (defvar *prompt2*       "....> ")
