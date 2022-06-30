@@ -1,6 +1,6 @@
 # sbcli
 
-A better REPL for SBCL. It handles errors greacefully, is not too verbose, has
+A better REPL for SBCL. It handles errors gracefully, is not too verbose, has
 readline capabilities, including multiline input and reset, and has optional
 syntax highlighting capabilities using [pygmentize](https://pygments.org/).
 
