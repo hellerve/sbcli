@@ -27,6 +27,7 @@
 (defvar *hist-file*    "~/.sbcli_history")
 (defvar *hist*         (list))
 (defvar *pygmentize*   nil)
+(defvar *pygmentize-options* (list "-s" "-l" "lisp"))
 (defvar *error*        nil)
 (declaim (special *special*))
 
@@ -298,7 +299,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
   (if *pygmentize*
     (with-input-from-string (s str)
       (let ((proc (sb-ext:run-program *pygmentize*
-                                      (list "-s" "-l" "lisp")
+                                      *pygmentize-options*
                                       :input s
                                       :output :stream)))
          (read-line (sb-ext:process-output proc) nil "")))

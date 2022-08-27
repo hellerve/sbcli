@@ -90,6 +90,8 @@ For reference, here is a complete list of the variables we expose:
 ; if you're unsure what to put there, i suggest using
 ; [which](https://github.com/eudoxia0/which)
 *pygmentize* ; => nil
+; you can also customize the pygmentize invocation
+*pygmentize-options* ; => ("-s" "-l" "lisp")
 
 ; the last error encountered in the REPL. You can call
 ; `invoke-debugger` on it!
