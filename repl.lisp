@@ -76,8 +76,11 @@ bar:qux
 
 (defun reset ()
   "Resets the session environment"
+  (delete-package 'sbcli-user)
   (delete-package 'sbcli)
   (defpackage :sbcli (:use :common-lisp))
+  (defpackage :sbcli-user
+    (:use :common-lisp :sbcli))
   (in-package :sbcli))
 
 (defun split (str chr)
