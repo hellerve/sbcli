@@ -13,9 +13,9 @@ into `$PREFIX/bin`, with the environment variable `PREFIX` defaulting to
 
 ## Dependencies
 
-`sbcli` depends on [Quicklisp](http://quicklisp.org/) and
-[cl-readline](https://github.com/mrkkrp/cl-readline). If you have Quicklisp
-installed, cl-readline will be installed on `sbcli`s first launch. `sbcli`
+`sbcli` depends on [alexandria(https://common-lisp.net/project/alexandria/], [cl-str](https://github.com/vindarel/cl-str) and
+[cl-readline](https://github.com/mrkkrp/cl-readline). If you have [Quicklisp](http://quicklisp.org/)
+installed, all the dependencies will be installed on `sbcli`s first launch. `sbcli`
 assumes that Quicklisp is installed under `~/quicklisp`.
 
 ## Usage
