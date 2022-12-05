@@ -1,11 +1,3 @@
-#!/usr/bin/env -S sbcl --script
-(load "~/quicklisp/setup")
-
-(let ((*standard-output* (make-broadcast-stream)))
-  (ql:quickload "alexandria")
-  (ql:quickload "cl-readline")
-  (ql:quickload "str"))
-
 (require :sb-introspect)
 
 (defpackage :sbcli
