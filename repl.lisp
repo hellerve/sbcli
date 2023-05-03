@@ -1,5 +1,19 @@
 #!/usr/bin/env -S sbcl --script
-(load "~/quicklisp/setup")
+
+;; check for the two most likely places quicklisp is installed and try to load it
+;; on v-refracta, it is simply installed in /var/lib/
+(let ((home-quicklisp (merge-pathnames "quicklisp/setup.lisp" (user-homedir-pathname)))
+  (var-quicklisp (merge-pathnames "setup.lisp" #p"/var/lib/quicklisp/")))
+  (handler-case
+      (cond
+        ((not (null (probe-file home-quicklisp))) (load home-quicklisp))
+        ((not (null (probe-file var-quicklisp)))  (load var-quicklisp))
+        (t
+          (error 'simple-package-error
+            :package "QUICKLISP-CLIENT"
+            :format-control "Quicklisp does not appear to be installed.~%")))
+    (package-error (condition)
+      (format *error-output* "Quicklisp does not appear to be installed.~%" condition))))
 
 (let ((*standard-output* (make-broadcast-stream)))
   (ql:quickload "alexandria")
