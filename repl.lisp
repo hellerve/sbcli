@@ -1,5 +1,22 @@
 #!/usr/bin/env -S sbcl --script
-(load "~/quicklisp/setup")
+
+(defvar *repl-version* "0.1.4")
+(defvar *repl-name*    "Veit's REPL for SBCL")
+(defvar *prompt*       "sbcl> ")
+(defvar *prompt2*       "....> ")
+(defvar *ret*          "=> ")
+(defvar *quicklisp*    "~/quicklisp/setup")
+(defvar *config-file*  "~/.sbclirc")
+(defvar *hist-file*    "~/.sbcli_history")
+(defvar *hist*         (list))
+(defvar *pygmentize*   nil)
+(defvar *pygmentize-options* (list "-s" "-l" "lisp"))
+(defvar *error*        nil)
+
+(if (probe-file *config-file*)
+  (load *config-file*))
+
+(load *quicklisp*)
 
 (let ((*standard-output* (make-broadcast-stream)))
   (ql:quickload "alexandria")
@@ -10,7 +27,7 @@
 
 (defpackage :sbcli
   (:use :common-lisp :cffi)
-  (:export sbcli *repl-version* *repl-name* *prompt* *prompt2* *ret* *config-file*
+  (:export sbcli *repl-version* *repl-name* *prompt* *prompt2* *ret* *config-file* *quicklisp*
            *hist-file* *special* *error*))
 
 (defpackage :sbcli-user
@@ -416,9 +433,6 @@ strings to match candidates against (for example in the form \"package:sym\")."
     (finish-output nil)
     (rl:register-function :redisplay #'syntax-hl)
     (sbcli "" *prompt*)))
-
-(if (probe-file *config-file*)
-  (load *config-file*))
 
 (format t "~a version ~a~%" *repl-name* *repl-version*)
 (write-line "Press CTRL-D or type :q to exit")

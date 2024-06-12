@@ -15,8 +15,7 @@ into `$PREFIX/bin`, with the environment variable `PREFIX` defaulting to
 
 `sbcli` depends on [alexandria(https://common-lisp.net/project/alexandria/], [cl-str](https://github.com/vindarel/cl-str) and
 [cl-readline](https://github.com/mrkkrp/cl-readline). If you have [Quicklisp](http://quicklisp.org/)
-installed, all the dependencies will be installed on `sbcli`s first launch. `sbcli`
-assumes that Quicklisp is installed under `~/quicklisp`.
+installed, all the dependencies will be installed on `sbcli`s first launch.
 
 ## Usage
 
@@ -76,6 +75,9 @@ For reference, here is a complete list of the variables we expose:
 
 ; the return value prompt
 *ret*          ; => "=> "
+
+; the path of quicklisp setup
+*quicklisp*    ; => "~/quicklisp/setup"
 
 ; where to store the history
 *hist-file*    ; => "~/.sbcli_history"
