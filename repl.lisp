@@ -1,10 +1,18 @@
 #!/usr/bin/env -S sbcl --script
-(load "~/quicklisp/setup")
+(let ((ql-setup (probe-file (merge-pathnames "quicklisp/setup.lisp"
+                                              (user-homedir-pathname)))))
+  (when ql-setup (load ql-setup)))
 
 (let ((*standard-output* (make-broadcast-stream)))
-  (ql:quickload "alexandria")
-  (ql:quickload "cl-readline")
-  (ql:quickload "str"))
+  (if (find-package :ql)
+      (let ((ql (find-symbol "QUICKLOAD" :ql)))
+        (funcall ql "alexandria")
+        (funcall ql "cl-readline")
+        (funcall ql "str"))
+      (progn
+        (require :alexandria)
+        (require :cl-readline)
+        (require :str))))
 
 (require :sb-introspect)
 
@@ -77,12 +85,13 @@ bar:qux
 
 (defun reset ()
   "Resets the session environment"
-  (delete-package 'sbcli-user)
-  (delete-package 'sbcli)
-  (defpackage :sbcli (:use :common-lisp))
-  (defpackage :sbcli-user
-    (:use :common-lisp :sbcli))
-  (in-package :sbcli))
+  (let ((pkg (find-package :sbcli-user)))
+    (do-symbols (s pkg)
+      (when (eq (symbol-package s) pkg)
+        (makunbound s)
+        (fmakunbound s)
+        (unintern s pkg))))
+  (in-package :sbcli-user))
 
 (defun split (str chr)
   (loop for i = 0 then (1+ j)
@@ -408,7 +417,6 @@ strings to match candidates against (for example in the form \"package:sym\")."
            (sb-sys:interactive-interrupt ()
              (write-char #\linefeed)
              ""))))
-    (in-package :sbcli-user)
     (unless text (end))
     (if (string= text "") (sbcli "" *prompt*))
     (when *hist-file* (update-hist-file text))
@@ -418,7 +426,6 @@ strings to match candidates against (for example in the form \"package:sym\")."
        (sbcli::symbol-documentation (last-nested-expr text)))
       (t
        (sbcli::handle-input txt text)))
-    (in-package :sbcli)
     (finish-output nil)
     (register-redisplay)
     (sbcli "" *prompt*)))
@@ -435,6 +442,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
 
 (sb-ext:enable-debugger)
 
-(handler-case (sbcli "" *prompt*)
-  (sb-sys:interactive-interrupt () (end)))
+(let ((*package* (find-package :sbcli-user)))
+  (handler-case (sbcli "" *prompt*)
+    (sb-sys:interactive-interrupt () (end))))
 
