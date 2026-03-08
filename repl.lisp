@@ -98,19 +98,6 @@ bar:qux
         (unintern s pkg))))
   (in-package :sbcli-user))
 
-(defun split (str chr)
-  (loop for i = 0 then (1+ j)
-        as j = (position chr str :start i)
-        collect (subseq str i j)
-        while j))
-
-(defun join (str chr)
-  (reduce (lambda (acc x)
-            (if (zerop (length acc))
-                x
-                (concatenate 'string acc chr x)))
-          str
-          :initial-value ""))
 
 (defun novelty-check (str1 str2)
   (string/= (string-trim " " str1)
@@ -182,18 +169,12 @@ bar:qux
 (defun dump-disasm (sym)
   "Dumps the disassembly of a symbol <sym>"
   (handler-case (disassemble (read-from-string sym))
-    (unbound-variable (var) (format t "~a~%" var))
-    (type-error (err) (format t "~a~%" err))
-    (sb-int:compiled-program-error (err) (format t "~a~%" err))
-    (undefined-function (fun) (format t "~a~%" fun))))
+    (error (e) (format t "~a~%" e))))
 
 (defun dump-type (expr)
   "Prints the type of a expression <expr>"
   (handler-case (format t "~a~%" (type-of (eval (read-from-string expr))))
-    (unbound-variable (var) (format t "~a~%" var))
-    (type-error (err) (format t "~a~%" err))
-    (sb-int:compiled-program-error (err) (format t "~a~%" err))
-    (undefined-function (fun) (format t "~a~%" fun))))
+    (error (e) (format t "~a~%" e))))
 
 (defun get-package-for-search (text)
   "Return a list with:
@@ -353,7 +334,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
         (fun (cdr fundef))
         (rl (length args)))
     (cond
-      ((= -1 l) (funcall fun (join args " ")))
+      ((= -1 l) (funcall fun (str:join " " args)))
       ((< rl l)
         (format *error-output*
                 "Expected ~a arguments to ~a, but got ~a!~%"
@@ -361,7 +342,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
       (t (apply fun (subseq args 0 l))))))
 
 (defun handle-special-input (text)
-  (let* ((splt (split text #\Space))
+  (let* ((splt (str:split #\Space text))
          (k (subseq (car splt) 1 (length (car splt))))
          (v (gethash k *special*)))
     (if v
@@ -389,6 +370,13 @@ strings to match candidates against (for example in the form \"package:sym\")."
 (defun code-location-source (location)
   (sb-debug::code-location-source-form location 0))
 
+(defun find-top-frame ()
+  "Walk from *current-frame* to the topmost frame."
+  (let ((f *current-frame*))
+    (loop for up = (ignore-errors (sb-di:frame-up f))
+          while up do (setf f up))
+    f))
+
 (defun debugger-print-frame (&optional (frame *current-frame*))
   "Print a single frame with its number."
   (when frame
@@ -401,18 +389,15 @@ strings to match candidates against (for example in the form \"package:sym\")."
   "Show backtrace starting from the most recent frame."
   (call-with-pager
     (lambda ()
-      (let ((frame *current-frame*))
-        (loop for up = (ignore-errors (sb-di:frame-up frame))
-              while up do (setf frame up))
-        (loop for f = frame then (ignore-errors (sb-di:frame-down f))
-              for i from 0 below count
-              while f
-              do (format t "~:[  ~;> ~]~d: "
-                         (eq f *current-frame*)
-                         (sb-di:frame-number f))
-                 (handler-case (print-frame-call f)
-                   (error () (format t "<error printing frame>")))
-                 (terpri))))))
+      (loop for f = (find-top-frame) then (ignore-errors (sb-di:frame-down f))
+            for i from 0 below count
+            while f
+            do (format t "~:[  ~;> ~]~d: "
+                       (eq f *current-frame*)
+                       (sb-di:frame-number f))
+               (handler-case (print-frame-call f)
+                 (error () (format t "<error printing frame>")))
+               (terpri)))))
 
 (defun debugger-frame-move (dir-fn fail-msg)
   "Move the current frame in the direction given by DIR-FN."
@@ -423,16 +408,13 @@ strings to match candidates against (for example in the form \"package:sym\")."
 
 (defun debugger-go-to-frame (n)
   "Navigate to frame number N."
-  (let ((frame *current-frame*))
-    (loop for up = (ignore-errors (sb-di:frame-up frame))
-          while up do (setf frame up))
-    (loop for f = frame then (ignore-errors (sb-di:frame-down f))
-          while f
-          when (= (sb-di:frame-number f) n)
-          do (setf *current-frame* f)
-             (debugger-print-frame)
-             (return)
-          finally (format *error-output* "Frame ~d not found.~%" n))))
+  (loop for f = (find-top-frame) then (ignore-errors (sb-di:frame-down f))
+        while f
+        when (= (sb-di:frame-number f) n)
+        do (setf *current-frame* f)
+           (debugger-print-frame)
+           (return)
+        finally (format *error-output* "Frame ~d not found.~%" n)))
 
 (defun debugger-locals ()
   "Show local variables in the current frame."
@@ -478,25 +460,29 @@ strings to match candidates against (for example in the form \"package:sym\")."
       (error ()
         (write-string output *standard-output*)))))
 
-(defun nth-code-location (debug-fun n)
-  "Get the Nth code location from DEBUG-FUN."
+(defun map-code-locations (debug-fun fn)
+  "Call FN with index and location for each code location in DEBUG-FUN."
   (let ((i 0))
     (sb-di:do-debug-fun-blocks (block debug-fun)
       (sb-di:do-debug-block-locations (loc block)
-        (when (= i n) (return-from nth-code-location loc))
+        (funcall fn i loc)
         (incf i)))
-    nil))
+    i))
+
+(defun nth-code-location (debug-fun n)
+  "Get the Nth code location from DEBUG-FUN."
+  (map-code-locations debug-fun
+    (lambda (i loc)
+      (when (= i n) (return-from nth-code-location loc))))
+  nil)
 
 (defun list-code-locations ()
   "List possible breakpoint locations in the current frame's function."
   (handler-case
       (let* ((debug-fun (sb-di:frame-debug-fun *current-frame*))
-             (i 0))
-        (sb-di:do-debug-fun-blocks (block debug-fun)
-          (sb-di:do-debug-block-locations (loc block)
-            (format t "  ~d: ~a~%" i loc)
-            (incf i)))
-        (when (zerop i)
+             (count (map-code-locations debug-fun
+                      (lambda (i loc) (format t "  ~d: ~a~%" i loc)))))
+        (when (zerop count)
           (format t "No code locations available.~%")))
     (error (c)
       (format *error-output* "Cannot list locations: ~a~%" c))))
@@ -622,10 +608,10 @@ strings to match candidates against (for example in the form \"package:sym\")."
                        (debugger-backtrace (or int-arg 20)))
                       ((member cmd '("up" "u") :test #'string=)
                        (debugger-frame-move #'sb-di:frame-down ;; toward caller
-                                            "Already at the bottom.~%"))
+                                            "Already at the top.~%"))
                       ((member cmd '("down" "d") :test #'string=)
                        (debugger-frame-move #'sb-di:frame-up ;; toward callee
-                                            "Already at the top.~%"))
+                                            "Already at the bottom.~%"))
                       ((member cmd '("frame" "f") :test #'string=)
                        (if int-arg (debugger-go-to-frame int-arg)
                            (format *error-output* "Usage: frame <number>~%")))
