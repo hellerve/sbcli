@@ -19,14 +19,14 @@
 (defpackage :sbcli
   (:use :common-lisp :cffi)
   (:export sbcli *repl-version* *repl-name* *prompt* *prompt2* *ret* *config-file*
-           *hist-file* *special* *error*))
+           *hist-file* *special* *error* *debug-prompt*))
 
 (defpackage :sbcli-user
   (:use :common-lisp :sbcli))
 
 (in-package :sbcli)
 
-(defvar *repl-version* "0.1.4")
+(defvar *repl-version* "0.2.0")
 (defvar *repl-name*    "Veit's REPL for SBCL")
 (defvar *prompt*       "sbcl> ")
 (defvar *prompt2*       "....> ")
@@ -37,6 +37,11 @@
 (defvar *pygmentize*   nil)
 (defvar *pygmentize-options* (list "-s" "-l" "lisp"))
 (defvar *error*        nil)
+(defvar *debug-prompt* (lambda (level) (format nil "debug[~a]> " level)))
+(defvar *debug-level*  0)
+(defvar *current-frame* nil)
+(defvar *breakpoints* nil)
+(defvar *breakpoint-counter* 0)
 (declaim (special *special*))
 
 (defun last-nested-expr (s/sexp)
@@ -93,19 +98,6 @@ bar:qux
         (unintern s pkg))))
   (in-package :sbcli-user))
 
-(defun split (str chr)
-  (loop for i = 0 then (1+ j)
-        as j = (position chr str :start i)
-        collect (subseq str i j)
-        while j))
-
-(defun join (str chr)
-  (reduce (lambda (acc x)
-            (if (zerop (length acc))
-                x
-                (concatenate 'string acc chr x)))
-          str
-          :initial-value ""))
 
 (defun novelty-check (str1 str2)
   (string/= (string-trim " " str1)
@@ -177,18 +169,12 @@ bar:qux
 (defun dump-disasm (sym)
   "Dumps the disassembly of a symbol <sym>"
   (handler-case (disassemble (read-from-string sym))
-    (unbound-variable (var) (format t "~a~%" var))
-    (type-error (err) (format t "~a~%" err))
-    (sb-int:compiled-program-error (err) (format t "~a~%" err))
-    (undefined-function (fun) (format t "~a~%" fun))))
+    (error (e) (format t "~a~%" e))))
 
 (defun dump-type (expr)
   "Prints the type of a expression <expr>"
   (handler-case (format t "~a~%" (type-of (eval (read-from-string expr))))
-    (unbound-variable (var) (format t "~a~%" var))
-    (type-error (err) (format t "~a~%" err))
-    (sb-int:compiled-program-error (err) (format t "~a~%" err))
-    (undefined-function (fun) (format t "~a~%" fun))))
+    (error (e) (format t "~a~%" e))))
 
 (defun get-package-for-search (text)
   "Return a list with:
@@ -348,7 +334,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
         (fun (cdr fundef))
         (rl (length args)))
     (cond
-      ((= -1 l) (funcall fun (join args " ")))
+      ((= -1 l) (funcall fun (str:join " " args)))
       ((< rl l)
         (format *error-output*
                 "Expected ~a arguments to ~a, but got ~a!~%"
@@ -356,31 +342,326 @@ strings to match candidates against (for example in the form \"package:sym\")."
       (t (apply fun (subseq args 0 l))))))
 
 (defun handle-special-input (text)
-  (let* ((splt (split text #\Space))
+  (let* ((splt (str:split #\Space text))
          (k (subseq (car splt) 1 (length (car splt))))
          (v (gethash k *special*)))
     (if v
       (call-special v (car splt) (cdr splt))
       (format *error-output* "Unknown special command: ~a~%" k))))
 
+(defun find-initial-frame ()
+  "Find the EVAL frame as the starting point for debugging."
+  (ignore-errors
+    (loop for f = (sb-di:top-frame) then (sb-di:frame-down f) ;; toward caller
+          while f
+          when (eq 'eval (ignore-errors
+                           (sb-di:debug-fun-name (sb-di:frame-debug-fun f))))
+          return f
+          finally (return (sb-di:top-frame)))))
+
+;; Wrappers for sb-debug internals (single point of maintenance)
+(defun print-frame-call (frame &optional (stream *standard-output*))
+  (sb-debug::print-frame-call frame stream))
+
+(defun debug-eval-in-frame (form frame)
+  (let ((sb-debug::*current-frame* frame))
+    (sb-debug::debug-eval form)))
+
+(defun code-location-source (location)
+  (sb-debug::code-location-source-form location 0))
+
+(defun find-top-frame ()
+  "Walk from *current-frame* to the topmost frame."
+  (let ((f *current-frame*))
+    (loop for up = (ignore-errors (sb-di:frame-up f))
+          while up do (setf f up))
+    f))
+
+(defun debugger-print-frame (&optional (frame *current-frame*))
+  "Print a single frame with its number."
+  (when frame
+    (format t "~d: " (sb-di:frame-number frame))
+    (handler-case (print-frame-call frame)
+      (error () (format t "<error printing frame>")))
+    (terpri)))
+
+(defun debugger-backtrace (&optional (count 20))
+  "Show backtrace starting from the most recent frame."
+  (call-with-pager
+    (lambda ()
+      (loop for f = (find-top-frame) then (ignore-errors (sb-di:frame-down f))
+            for i from 0 below count
+            while f
+            do (format t "~:[  ~;> ~]~d: "
+                       (eq f *current-frame*)
+                       (sb-di:frame-number f))
+               (handler-case (print-frame-call f)
+                 (error () (format t "<error printing frame>")))
+               (terpri)))))
+
+(defun debugger-frame-move (dir-fn fail-msg)
+  "Move the current frame in the direction given by DIR-FN."
+  (let ((next (ignore-errors (funcall dir-fn *current-frame*))))
+    (if next
+        (progn (setf *current-frame* next) (debugger-print-frame))
+        (format *error-output* fail-msg))))
+
+(defun debugger-go-to-frame (n)
+  "Navigate to frame number N."
+  (loop for f = (find-top-frame) then (ignore-errors (sb-di:frame-down f))
+        while f
+        when (= (sb-di:frame-number f) n)
+        do (setf *current-frame* f)
+           (debugger-print-frame)
+           (return)
+        finally (format *error-output* "Frame ~d not found.~%" n)))
+
+(defun debugger-locals ()
+  "Show local variables in the current frame."
+  (handler-case
+      (let* ((debug-fun (sb-di:frame-debug-fun *current-frame*))
+             (vars (sb-di::debug-fun-debug-vars debug-fun)))
+        (if (and vars (> (length vars) 0))
+            (loop for var across vars
+                  do (format t "  ~a = ~a~%"
+                             (sb-di:debug-var-symbol var)
+                             (handler-case
+                                 (format nil "~s"
+                                         (sb-di:debug-var-value var *current-frame*))
+                               (error () "<unavailable>"))))
+            (format t "No local variables.~%")))
+    (error (c)
+      (format *error-output* "Cannot inspect locals: ~a~%" c))))
+
+(defun debugger-source ()
+  "Show source for the current frame."
+  (handler-case
+      (let ((loc (sb-di:frame-code-location *current-frame*)))
+        (if loc
+            (handler-case
+                (format t "~s~%" (code-location-source loc))
+              (error () (format t "Source not available.~%")))
+            (format t "No code location.~%")))
+    (error (c)
+      (format *error-output* "Cannot show source: ~a~%" c))))
+
+(defun call-with-pager (fn)
+  "Call FN with output captured, then display through a pager."
+  (let ((output (with-output-to-string (*standard-output*)
+                  (funcall fn))))
+    (handler-case
+        (let* ((pager-cmd (or (sb-ext:posix-getenv "PAGER") "less"))
+               (pager-args (if (search "less" pager-cmd) '("-FRX") nil)))
+          (with-input-from-string (in output)
+            (sb-ext:run-program "/usr/bin/env" (cons pager-cmd pager-args)
+                                :input in
+                                :output t
+                                :wait t)))
+      (error ()
+        (write-string output *standard-output*)))))
+
+(defun map-code-locations (debug-fun fn)
+  "Call FN with index and location for each code location in DEBUG-FUN."
+  (let ((i 0))
+    (sb-di:do-debug-fun-blocks (block debug-fun)
+      (sb-di:do-debug-block-locations (loc block)
+        (funcall fn i loc)
+        (incf i)))
+    i))
+
+(defun nth-code-location (debug-fun n)
+  "Get the Nth code location from DEBUG-FUN."
+  (map-code-locations debug-fun
+    (lambda (i loc)
+      (when (= i n) (return-from nth-code-location loc))))
+  nil)
+
+(defun list-code-locations ()
+  "List possible breakpoint locations in the current frame's function."
+  (handler-case
+      (let* ((debug-fun (sb-di:frame-debug-fun *current-frame*))
+             (count (map-code-locations debug-fun
+                      (lambda (i loc) (format t "  ~d: ~a~%" i loc)))))
+        (when (zerop count)
+          (format t "No code locations available.~%")))
+    (error (c)
+      (format *error-output* "Cannot list locations: ~a~%" c))))
+
+(defun debugger-set-breakpoint (n)
+  "Set a breakpoint at code location N in the current frame's function."
+  (handler-case
+      (let* ((debug-fun (sb-di:frame-debug-fun *current-frame*))
+             (loc (nth-code-location debug-fun n)))
+        (if loc
+            (let* ((bp (sb-di:make-breakpoint #'breakpoint-hook loc
+                                              :kind :code-location))
+                   (id (incf *breakpoint-counter*)))
+              (sb-di:activate-breakpoint bp)
+              (push (list id bp loc) *breakpoints*)
+              (format t "Breakpoint ~a set.~%" id))
+            (format *error-output* "No code location ~a.~%" n)))
+    (error (c)
+      (format *error-output* "Cannot set breakpoint: ~a~%" c))))
+
+(defun debugger-list-breakpoints ()
+  "List all active breakpoints."
+  (if *breakpoints*
+      (loop for (id bp loc) in *breakpoints*
+            do (format t "  ~a: ~a (~:[inactive~;active~])~%"
+                       id loc (sb-di:breakpoint-active-p bp)))
+      (format t "No breakpoints set.~%")))
+
+(defun debugger-delete-breakpoint (n)
+  "Delete breakpoint N."
+  (let ((entry (find n *breakpoints* :key #'first)))
+    (if entry
+        (progn (sb-di:deactivate-breakpoint (second entry))
+               (setf *breakpoints* (remove entry *breakpoints*))
+               (format t "Breakpoint ~a deleted.~%" n))
+        (format *error-output* "No breakpoint ~a.~%" n))))
+
+(defun breakpoint-hook (frame bp)
+  "Called when a breakpoint is hit."
+  (let* ((*current-frame* frame)
+         (entry (find bp *breakpoints* :key #'second)))
+    (when entry
+      (format *error-output* "~&Hit breakpoint ~a~%" (first entry)))
+    (restart-case
+        (sbcli-debugger (make-condition 'simple-condition
+                                        :format-control "Breakpoint hit"
+                                        :format-arguments nil))
+      (continue ()
+        :report "Continue from breakpoint"
+        nil))))
+
+(defun try-invoke-restart (name condition &optional msg)
+  "Try to invoke restart NAME. Print MSG if not found."
+  (let ((r (find-restart name condition)))
+    (if r (invoke-restart r)
+        (format *error-output* "~a~%"
+                (or msg (format nil "No ~(~a~) restart available." name))))))
+
+(defun debugger-help ()
+  "Show debugger help."
+  (format t "Debugger commands:
+  bt [N]         Backtrace (default 20 frames)
+  up, u          Move up the call stack (toward caller)
+  down, d        Move down the call stack (toward callee)
+  frame N, f N   Go to frame N
+  locals, l      Show local variables
+  source, src    Show source for current frame
+  print, p       Print current frame
+  break N, br N  Set breakpoint at code location N
+  list-breaks, lb   List breakpoints
+  delete-break N, db N  Delete breakpoint N
+  list-locations, ll  List breakpoint locations
+  step/next/out  Stepping (requires (step ...) form)
+  abort, a       Abort to toplevel
+  help, h, ?     Show this help
+  <number>       Invoke restart by number
+  <expression>   Evaluate Lisp expression (frame-aware)
+  Ctrl-D         Abort to toplevel~%"))
+
+(defun sbcli-debugger (condition)
+  "Interactive debugger for sbcli."
+  (when (typep condition 'error)
+    (setf *error* condition))
+  (let* ((*debug-level* (1+ *debug-level*))
+         (*current-frame* (find-initial-frame))
+         (restarts (compute-restarts condition)))
+    (format *error-output* "~&~a~%~%" condition)
+    (format *error-output* "Available restarts:~%")
+    (loop for restart in restarts for i from 0
+          do (format *error-output* "  ~a: [~a] ~a~%"
+                     i (restart-name restart) restart))
+    (terpri *error-output*)
+    (when *current-frame* (debugger-print-frame))
+    (format *error-output* "~%Type 'help' for debugger commands.~%")
+    (force-output *error-output*)
+    (loop
+      (let ((input
+              (handler-case
+                  (rl:readline :prompt (funcall *debug-prompt* *debug-level*))
+                (sb-sys:interactive-interrupt ()
+                  (terpri) (try-invoke-restart 'abort condition) nil))))
+        (unless input
+          (terpri) (try-invoke-restart 'abort condition) (return))
+        (let ((trimmed (str:trim input)))
+          (if (zerop (length trimmed)) nil
+              ;; Pure number → restart selection
+              (if (every #'digit-char-p trimmed)
+                  (let ((n (parse-integer trimmed)))
+                    (if (< n (length restarts))
+                        (invoke-restart-interactively (nth n restarts))
+                        (format *error-output* "No restart ~a (0-~a available).~%"
+                                n (1- (length restarts)))))
+                  ;; Otherwise: command + args
+                  (let* ((space-pos (position #\Space trimmed))
+                         (cmd (string-downcase
+                                (if space-pos (subseq trimmed 0 space-pos) trimmed)))
+                         (args (if space-pos
+                                   (str:trim (subseq trimmed (1+ space-pos))) ""))
+                         (int-arg (and (> (length args) 0)
+                                       (ignore-errors (parse-integer args)))))
+                    (cond
+                      ((member cmd '("bt" "backtrace") :test #'string=)
+                       (debugger-backtrace (or int-arg 20)))
+                      ((member cmd '("up" "u") :test #'string=)
+                       (debugger-frame-move #'sb-di:frame-down ;; toward caller
+                                            "Already at the top.~%"))
+                      ((member cmd '("down" "d") :test #'string=)
+                       (debugger-frame-move #'sb-di:frame-up ;; toward callee
+                                            "Already at the bottom.~%"))
+                      ((member cmd '("frame" "f") :test #'string=)
+                       (if int-arg (debugger-go-to-frame int-arg)
+                           (format *error-output* "Usage: frame <number>~%")))
+                      ((member cmd '("locals" "l") :test #'string=) (debugger-locals))
+                      ((member cmd '("source" "src") :test #'string=) (debugger-source))
+                      ((member cmd '("print" "p") :test #'string=) (debugger-print-frame))
+                      ((member cmd '("break" "br") :test #'string=)
+                       (if int-arg (debugger-set-breakpoint int-arg)
+                           (format *error-output* "Usage: break <location>~%")))
+                      ((member cmd '("list-breaks" "lb") :test #'string=)
+                       (debugger-list-breakpoints))
+                      ((member cmd '("delete-break" "db") :test #'string=)
+                       (if int-arg (debugger-delete-breakpoint int-arg)
+                           (format *error-output* "Usage: delete-break <id>~%")))
+                      ((member cmd '("list-locations" "ll") :test #'string=)
+                       (list-code-locations))
+                      ((string= cmd "step")
+                       (try-invoke-restart 'sb-ext:step-into condition
+                         "No step-into restart. Use (step ...) to enable stepping."))
+                      ((string= cmd "next")
+                       (try-invoke-restart 'sb-ext:step-next condition))
+                      ((string= cmd "out")
+                       (try-invoke-restart 'sb-ext:step-out condition))
+                      ((member cmd '("abort" "a") :test #'string=)
+                       (try-invoke-restart 'abort condition))
+                      ((member cmd '("help" "h" "?") :test #'string=) (debugger-help))
+                      (t (handler-case
+                             (let ((results (multiple-value-list
+                                              (debug-eval-in-frame
+                                                (read-from-string trimmed)
+                                                *current-frame*))))
+                               (format t "~{~s~&~}" results))
+                           (error (c) (format *error-output* "~a~%" c)))))))))
+      (finish-output)))))
+
 (defun evaluate-lisp (text parsed)
   "Evaluate (EVAL) the user input.
-  In case of evaluation error, print the error.
+  In case of error, enter the interactive debugger with available restarts.
   Then print the result. Print its multiple values on multiple lines.
   Save the input history.
   Handle the special *, + et all REPL history variables."
   (let ((result-list
          (multiple-value-list
-          (handler-case (eval parsed)
-            (unbound-variable (var)
-              (format *error-output* "~a~%" var))
-            (undefined-function (fun)
-              (format *error-output* "~a~%" fun))
-            (sb-int:compiled-program-error ()
-              (format *error-output* "Compiler error.~%"))
-            (error (condition)
-	      (setf *error* condition)
-              (format *error-output* "Evaluation error: ~a~%" condition))))))
+          (restart-case
+              (handler-bind
+                  ((error #'sbcli-debugger))
+                (eval parsed))
+            (abort ()
+              :report "Return to sbcli toplevel"
+              (values))))))
     (when result-list
       (add-res text (car result-list))
       (setf +++ ++
@@ -441,6 +722,7 @@ strings to match candidates against (for example in the form \"package:sym\")."
 (when *hist-file* (read-hist-file))
 
 (sb-ext:enable-debugger)
+(setf sb-ext:*stepper-hook* #'sbcli-debugger)
 
 (let ((*package* (find-package :sbcli-user)))
   (handler-case (sbcli "" *prompt*)

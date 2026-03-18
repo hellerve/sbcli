@@ -35,6 +35,35 @@ Typing `:doc symbol` prints the available documentation for this symbol.
 
 Typing `(symbol ?` also prints the available documentation for this symbol.
 
+When an error occurs, `sbcli` enters an interactive debugger that shows
+available restarts. The debugger supports the following commands:
+
+| Command | Description |
+|---------|-------------|
+| `bt [N]` | Show backtrace (default 20 frames) |
+| `up`, `u` | Move up the call stack (toward caller) |
+| `down`, `d` | Move down the call stack (toward callee) |
+| `frame N`, `f N` | Jump to frame N |
+| `locals`, `l` | Show local variables in the current frame |
+| `source`, `src` | Show source for the current frame |
+| `print`, `p` | Print the current frame |
+| `break N`, `br N` | Set breakpoint at code location N |
+| `list-breaks`, `lb` | List all breakpoints |
+| `delete-break N`, `db N` | Delete breakpoint N |
+| `list-locations`, `ll` | List breakpoint locations in current function |
+| `step` | Step into (requires `(step ...)` to be active) |
+| `next` | Step to next form |
+| `out` | Step out of current function |
+| `abort`, `a` | Abort back to the toplevel |
+| `help`, `h`, `?` | Show debugger help |
+| *number* | Invoke restart by number |
+| *expression* | Evaluate a Lisp expression (frame-aware, can access locals) |
+| `CTRL-D` | Abort back to the toplevel |
+
+Backtraces are piped through a pager (`$PAGER` or `less`) for comfortable
+reading. Expressions evaluated in the debugger are frame-aware — you can
+reference local variables from the current frame.
+
 Typing `:q`, `CTRL-D`, or `CTRL-C` will exit the REPL.
 
 Typing `:r` resets the environment.
@@ -93,9 +122,11 @@ For reference, here is a complete list of the variables we expose:
 ; you can also customize the pygmentize invocation
 *pygmentize-options* ; => ("-s" "-l" "lisp")
 
-; the last error encountered in the REPL. You can call
-; `invoke-debugger` on it!
+; the last error encountered in the REPL
 *error*
+
+; the debugger prompt, a function that takes the nesting level as argument
+*debug-prompt* ; => (lambda (level) (format nil "debug[~a]> " level))
 ```
 
 <hr/>
